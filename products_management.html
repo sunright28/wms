@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS 產品主檔維護系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8">
+
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.15),transparent_45%)] pointer-events-none"></div>
+
+    <div class="max-w-2xl mx-auto space-y-6 relative z-10">
+        
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-800/60 p-4 rounded-2xl border border-slate-700/50 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-emerald-500/20 text-emerald-400 p-3 rounded-xl border border-emerald-500/30">
+                    <i class="fa-solid fa-boxes-packing text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-wider text-slate-100">產品主檔維護</h1>
+                    <p class="text-xs text-slate-400">使用者：<span id="operator-display" class="text-emerald-400 font-mono font-bold">讀取中...</span></p>
+                </div>
+            </div>
+            <a href="index.html" class="text-xs bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-xl text-slate-300 hover:text-white font-medium transition-all cursor-pointer">
+                <i class="fa-solid fa-arrow-left mr-1"></i> 回主選單
+            </a>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700/60 shadow-xl space-y-4 relative">
+            <div class="flex justify-between items-center">
+                <h2 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                    <i class="fa-solid fa-magnifying-glass text-emerald-400"></i> 第一步：輸入品號或品名關鍵字
+                </h2>
+                <button id="btn-show-add-mode" onclick="switchToCreateMode()" style="display: none;" class="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-xl text-white font-bold transition-all cursor-pointer shadow-md shadow-emerald-950/50 flex items-center gap-1">
+                    <i class="fa-solid fa-plus text-[10px]"></i> 新增產品資料
+                </button>
+            </div>
+            <div class="relative">
+                <div class="flex gap-3">
+                    <div class="flex-1 relative">
+                        <input type="text" id="search-keyword" oninput="handleSearchInput()" placeholder="輸入品號或品名關鍵字 (如: 340198 或 粉絲)" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-10 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-base font-medium">
+                        <button onclick="clearSearch()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"><i class="fa-solid fa-circle-xmark"></i></button>
+                    </div>
+                </div>
+
+                <div id="search-dropdown" class="hidden absolute left-0 right-0 mt-2 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-50 divide-y divide-slate-800/60">
+                </div>
+            </div>
+        </div>
+
+        <div id="edit-form-section" class="hidden bg-slate-800 p-6 rounded-2xl border border-emerald-500/20 shadow-xl space-y-6">
+            <div class="border-b border-slate-700/60 pb-3 flex justify-between items-center">
+                <h2 id="form-mode-title" class="text-sm font-bold text-slate-300 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-emerald-400"></i> 第二步：修改產品規格欄位
+                </h2>
+                <span id="form-badge" class="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md font-mono border border-emerald-500/20">品號鎖定中</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div class="sm:col-span-2">
+                    <label id="label-item-no" class="block text-xs font-bold text-slate-400 mb-1">產品品號 (固定)</label>
+                    <input type="text" id="form-item-no" disabled class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-500 font-mono cursor-not-allowed">
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-bold text-slate-400 mb-1">產品品名</label>
+                    <input type="text" id="form-item-name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">產品規格</label>
+                    <input type="text" id="form-spec" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">入數 (包/箱)</label>
+                    <input type="number" id="form-pack-qty" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">每板標準箱數 (滿板)</label>
+                    <input type="number" id="form-pallets-box-qty" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">每層底數 (箱/層)</label>
+                    <input type="number" id="form-base-qty" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">才積 / 箱 (Cubic)</label>
+                    <input type="number" step="0.001" id="form-cubic" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">單箱毛重 (kg)</label>
+                    <input type="number" step="0.01" id="form-gross-weight" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">外箱長度 (cm)</label>
+                    <input type="number" step="0.1" id="form-length" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">外箱寬度 (cm)</label>
+                    <input type="number" step="0.1" id="form-width" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">外箱高度 (cm)</label>
+                    <input type="number" step="0.1" id="form-height" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">保存年限 (天/月)</label>
+                    <input type="text" id="form-shelf-life" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-700/60 flex flex-col sm:flex-row justify-end gap-3 items-center">
+                <button id="btn-copy-product" onclick="handleCopyToNewProduct()" type="button" style="display: none;" class="w-full sm:w-auto mr-auto bg-amber-600 hover:bg-amber-500 text-white font-bold px-5 py-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer order-3 sm:order-1">
+                    <i class="fa-solid fa-copy"></i> 複製到新產品
+                </button>
+                
+                <button onclick="handleCancel()" type="button" class="w-full sm:w-auto bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer order-2 sm:order-2">
+                    <i class="fa-solid fa-ban"></i> 取消變更
+                </button>
+                <button onclick="handleFormSubmit()" id="btn-save" class="w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-3">
+                    <i class="fa-solid fa-floppy-disk"></i> 儲存變更並同步雲端
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentOperator = urlParams.get("username") || "未明管理員";
+        
+        // 🛠️ 讀取當前角色權限：優先由 localStorage 取得精確角色，若無則看 URL
+        let currentRole = "";
+        try {
+            const cachedUser = localStorage.getItem("currentUser");
+            if (cachedUser) {
+                const userObj = JSON.parse(cachedUser);
+                currentRole = userObj.role || "";
+            }
+        } catch(e) { console.error("解析快取使用者失敗", e); }
+        if (!currentRole) {
+            currentRole = (urlParams.get("role") || "").trim().toLowerCase();
+        }
+
+        let debounceTimer; 
+        let isCreateMode = false; 
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("operator-display").innerText = currentOperator;
+            
+            const btnShowAdd = document.getElementById("btn-show-add-mode");
+            if (btnShowAdd) {
+                if (currentRole === "admin") {
+                    btnShowAdd.style.display = "block";
+                } else {
+                    btnShowAdd.style.display = "none";
+                }
+            }
+            
+            document.addEventListener("click", (e) => {
+                if (!e.target.closest('#search-keyword') && !e.target.closest('#search-dropdown')) {
+                    document.getElementById("search-dropdown").classList.add("hidden");
+                }
+            });
+        });
+
+        function clearSearch() {
+            document.getElementById("search-keyword").value = "";
+            document.getElementById("search-dropdown").classList.add("hidden");
+            document.getElementById("edit-form-section").classList.add("hidden");
+            resetFormToEditMode(); 
+        }
+
+        function handleSearchInput() {
+            clearTimeout(debounceTimer);
+            const keyword = document.getElementById("search-keyword").value.trim();
+            const dropdown = document.getElementById("search-dropdown");
+
+            if (!keyword || isCreateMode) {
+                dropdown.classList.add("hidden");
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const queryUrl = `${SUPABASE_URL}/rest/v1/products?or=(item_no.ilike.*${encodeURIComponent(keyword)}*,item_name.ilike.*${encodeURIComponent(keyword)}*)&select=item_no,item_name&limit=10`;
+                    
+                    const res = await fetch(queryUrl, {
+                        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+                    });
+
+                    if (!res.ok) return;
+                    const matches = await res.json();
+
+                    if (matches.length === 0) {
+                        dropdown.innerHTML = `<div class="p-4 text-xs text-slate-500 text-center italic">❌ 找不到符合的產品</div>`;
+                        dropdown.classList.remove("hidden");
+                        return;
+                    }
+
+                    dropdown.innerHTML = matches.map(prod => `
+                        <div onclick="selectProduct('${prod.item_no}')" class="px-4 py-3 hover:bg-slate-800 cursor-pointer transition-colors flex justify-between items-center text-sm group">
+                            <span class="font-mono text-emerald-400 font-bold group-hover:text-white transition-colors">${prod.item_no}</span>
+                            <span class="text-slate-300 text-xs max-w-[70%] truncate group-hover:text-white transition-colors">${prod.item_name}</span>
+                        </div>
+                    `).join('');
+
+                    dropdown.classList.remove("hidden");
+
+                } catch (err) {
+                    console.error("聯想搜尋失敗:", err);
+                }
+            }, 300);
+        }
+
+        async function selectProduct(itemNo) {
+            document.getElementById("search-dropdown").classList.add("hidden");
+            resetFormToEditMode();
+            
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/products?item_no=eq.${encodeURIComponent(itemNo)}&select=*`, {
+                    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+                });
+
+                if (!res.ok) throw new Error("資料庫連線失敗");
+                const data = await res.json();
+
+                if (data.length > 0) {
+                    const prod = data[0];
+                    
+                    document.getElementById("search-keyword").value = `${prod.item_no} - ${prod.item_name}`;
+
+                    document.getElementById("form-item-no").value = prod.item_no || "";
+                    document.getElementById("form-item-name").value = prod.item_name || "";
+                    document.getElementById("form-spec").value = prod.spec || "";
+                    document.getElementById("form-pack-qty").value = prod.pack_qty || "";
+                    document.getElementById("form-pallets-box-qty").value = prod.pallets_box_qty || "";
+                    document.getElementById("form-base-qty").value = prod.base_qty || "";
+                    document.getElementById("form-cubic").value = prod.cubic_per_box || ""; 
+                    document.getElementById("form-gross-weight").value = prod.gross_weight || "";
+                    document.getElementById("form-length").value = prod.length || "";
+                    document.getElementById("form-width").value = prod.width || "";
+                    document.getElementById("form-height").value = prod.height || "";
+                    document.getElementById("form-shelf-life").value = prod.shelf_life || "";
+
+                    // 🎯 權限功能控制：若是 admin，進入產品修改模式時顯示「複製到新產品」按鈕
+                    const btnCopy = document.getElementById("btn-copy-product");
+                    if (btnCopy) {
+                        btnCopy.style.display = (currentRole === "admin") ? "block" : "none";
+                    }
+
+                    document.getElementById("edit-form-section").classList.remove("hidden");
+                }
+            } catch (err) {
+                alert(`讀取詳細資料失敗: ${err.message}`);
+            }
+        }
+
+        function switchToCreateMode() {
+            isCreateMode = true;
+            document.getElementById("search-keyword").value = "✨ 正在建立全新產品項目記錄";
+            document.getElementById("form-mode-title").innerHTML = `<i class="fa-solid fa-folder-plus text-cyan-400"></i> 第二步：建立全新產品記錄`;
+            
+            const badge = document.getElementById("form-badge");
+            badge.innerText = "全新建立模式";
+            badge.className = "text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-mono border border-cyan-500/20";
+            
+            document.getElementById("label-item-no").innerHTML = `產品品號 <span class="text-rose-400">*必填且不得重複</span>`;
+            const itemNoInput = document.getElementById("form-item-no");
+            itemNoInput.disabled = false;
+            itemNoInput.className = "w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-cyan-500";
+            
+            // 隱藏複製按鈕（建立模式下不需再顯示複製）
+            const btnCopy = document.getElementById("btn-copy-product");
+            if (btnCopy) btnCopy.style.display = "none";
+            
+            const btnSave = document.getElementById("btn-save");
+            btnSave.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> 確認新增並發布雲端`;
+            btnSave.className = "w-full sm:w-auto bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-cyan-950/40 flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-3";
+        }
+
+        // 🎯 複製到新產品的按鈕點擊處理邏輯
+        function handleCopyToNewProduct() {
+            if (!confirm("確定要將此產品數據複製為新範本嗎？\n系統將切換至新增介面，並保留目前的規格數值供您修改。")) {
+                return;
+            }
+            
+            // 1. 先呼叫切換至新增模式（調整標題、CSS、狀態、隱藏複製按鈕）
+            switchToCreateMode();
+            
+            // 2. 清空產品品號欄位（強制品號必須重新輸入，以防重複主鍵錯誤）
+            const itemNoInput = document.getElementById("form-item-no");
+            itemNoInput.value = "";
+            itemNoInput.focus();
+            
+            // 3. 在品名後方補上「- 複製」字樣，提醒使用者這是複製出來的
+            const nameInput = document.getElementById("form-item-name");
+            if (nameInput.value && !nameInput.value.includes("複製")) {
+                nameInput.value = nameInput.value + " - 複製";
+            }
+        }
+
+        function resetFormToEditMode() {
+            isCreateMode = false;
+            document.getElementById("form-mode-title").innerHTML = `<i class="fa-solid fa-pen-to-square text-emerald-400"></i> 第二步：修改產品規格欄位`;
+            
+            const badge = document.getElementById("form-badge");
+            badge.innerText = "品號鎖定中";
+            badge.className = "text-xs bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md font-mono border border-emerald-500/20";
+            
+            document.getElementById("label-item-no").innerText = "產品品號 (固定)";
+            const itemNoInput = document.getElementById("form-item-no");
+            itemNoInput.disabled = true;
+            itemNoInput.className = "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-500 font-mono cursor-not-allowed";
+            
+            const btnCopy = document.getElementById("btn-copy-product");
+            if (btnCopy) btnCopy.style.display = "none";
+            
+            const btnSave = document.getElementById("btn-save");
+            btnSave.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> 儲存變更並同步雲端`;
+            btnSave.className = "w-full sm:w-auto bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-3";
+        }
+
+        function clearFormFields() {
+            document.getElementById("form-item-no").value = "";
+            document.getElementById("form-item-name").value = "";
+            document.getElementById("form-spec").value = "";
+            document.getElementById("form-pack-qty").value = "";
+            document.getElementById("form-pallets-box-qty").value = "";
+            document.getElementById("form-base-qty").value = "";
+            document.getElementById("form-cubic").value = "";
+            document.getElementById("form-gross-weight").value = "";
+            document.getElementById("form-length").value = "";
+            document.getElementById("form-width").value = "";
+            document.getElementById("form-height").value = "";
+            document.getElementById("form-shelf-life").value = "";
+        }
+
+        function handleCancel() {
+            if (confirm("確定要取消本次操作嗎？未儲存的變更將會遺失。")) {
+                clearSearch();
+            }
+        }
+
+        function handleFormSubmit() {
+            if (isCreateMode) {
+                executeInsertProduct();
+            } else {
+                saveProductChange(); 
+            }
+        }
+
+        async function executeInsertProduct() {
+            const itemNo = document.getElementById("form-item-no").value.trim();
+            const itemName = document.getElementById("form-item-name").value.trim();
+            const btnSave = document.getElementById("btn-save");
+
+            if (!itemNo || !itemName) {
+                alert("❌ 產品品號與產品品名為必填欄位！");
+                return;
+            }
+
+            const insertData = {
+                item_no: itemNo, 
+                item_name: itemName,
+                spec: document.getElementById("form-spec").value.trim(),
+                pack_qty: document.getElementById("form-pack-qty").value ? parseInt(document.getElementById("form-pack-qty").value) : null,
+                pallets_box_qty: document.getElementById("form-pallets-box-qty").value ? parseInt(document.getElementById("form-pallets-box-qty").value) : null,
+                base_qty: document.getElementById("form-base-qty").value ? parseInt(document.getElementById("form-base-qty").value) : null,
+                cubic_per_box: document.getElementById("form-cubic").value ? parseFloat(document.getElementById("form-cubic").value) : null,
+                gross_weight: document.getElementById("form-gross-weight").value ? parseFloat(document.getElementById("form-gross-weight").value) : null,
+                length: document.getElementById("form-length").value ? parseFloat(document.getElementById("form-length").value) : null,
+                width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
+                height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
+                shelf_life: document.getElementById("form-shelf-life").value.trim(),
+                updated_by: `${currentOperator}`
+            };
+
+            if (!confirm(`確定要建立全新產品 [${itemNo} - ${itemName}] 嗎？`)) {
+                return;
+            }
+
+            btnSave.disabled = true;
+            btnSave.innerHTML = `<i class="fa-solid fa-spinner animate-spin mr-2"></i> 正在發布雲端...`;
+
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/products`, {
+                    method: "POST",
+                    headers: {
+                        "apikey": SUPABASE_KEY,
+                        "Authorization": `Bearer ${SUPABASE_KEY}`,
+                        "Content-Type": "application/json",
+                        "Prefer": "return=minimal"
+                    },
+                    body: JSON.stringify(insertData)
+                });
+
+                if (!res.ok) {
+                    const errText = await res.text();
+                    if (errText.includes("duplicate key")) {
+                        throw new Error(`品號 [${itemNo}] 已經重複存在於系統中，請勿重複建立！`);
+                    }
+                    throw new Error(errText);
+                }
+
+                alert(`🎉 新增成功！\n全新產品 [${itemNo}] 已成功寫入雲端主檔。`);
+                clearSearch();
+
+            } catch (err) {
+                alert(`建立失敗: ${err.message}`);
+            } finally {
+                btnSave.disabled = false;
+                resetFormToEditMode();
+            }
+        }
+
+        async function saveProductChange() {
+            const itemNo = document.getElementById("form-item-no").value;
+            const btnSave = document.getElementById("btn-save");
+
+            const updateData = {
+                item_name: document.getElementById("form-item-name").value.trim(),
+                spec: document.getElementById("form-spec").value.trim(),
+                pack_qty: document.getElementById("form-pack-qty").value ? parseInt(document.getElementById("form-pack-qty").value) : null,
+                pallets_box_qty: document.getElementById("form-pallets-box-qty").value ? parseInt(document.getElementById("form-pallets-box-qty").value) : null,
+                base_qty: document.getElementById("form-base-qty").value ? parseInt(document.getElementById("form-base-qty").value) : null,
+                cubic_per_box: document.getElementById("form-cubic").value ? parseFloat(document.getElementById("form-cubic").value) : null,
+                gross_weight: document.getElementById("form-gross-weight").value ? parseFloat(document.getElementById("form-gross-weight").value) : null,
+                length: document.getElementById("form-length").value ? parseFloat(document.getElementById("form-length").value) : null,
+                width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
+                height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
+                shelf_life: document.getElementById("form-shelf-life").value.trim()
+            };
+
+            if (!updateData.item_name) {
+                alert("產品品名不能為空！");
+                return;
+            }
+
+            if (!confirm(`確定要儲存品號 [${itemNo}] 的變更嗎？\n此動作將會立即同步更新雲端資料。`)) {
+                return;
+            }
+
+            btnSave.disabled = true;
+            btnSave.innerHTML = `<i class="fa-solid fa-spinner animate-spin mr-2"></i> 正在上傳至雲端...`;
+
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/products?item_no=eq.${encodeURIComponent(itemNo)}`, {
+                    method: "PATCH",
+                    headers: {
+                        "apikey": SUPABASE_KEY,
+                        "Authorization": `Bearer ${SUPABASE_KEY}`,
+                        "Content-Type": "application/json",
+                        "Prefer": "return=minimal"
+                    },
+                    body: JSON.stringify(updateData)
+                });
+
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(errText);
+                }
+
+                try {
+                    await fetch(`${SUPABASE_URL}/rest/v1/products?item_no=eq.${encodeURIComponent(itemNo)}`, {
+                        method: "PATCH",
+                        headers: {
+                            "apikey": SUPABASE_KEY,
+                            "Authorization": `Bearer ${SUPABASE_KEY}`,
+                            "Content-Type": "application/json",
+                            "Prefer": "return=minimal"
+                        },
+                        body: JSON.stringify({ updated_by: `${currentOperator}` })
+                    });
+                } catch (e) {
+                    console.log("歷程記錄由底層自動扣接中");
+                }
+
+                alert(`🎉 儲存成功！\n品號 [${itemNo}] 的最新規格已成功同步至雲端系統。`);
+                clearSearch(); 
+                
+            } catch (err) {
+                alert(`儲存失敗: 發生技術性錯誤\n${err.message}`);
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> 儲存變更並同步雲端`;
+            }
+        }
+    </script>
+</body>
+</html>

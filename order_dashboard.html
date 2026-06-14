@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS 後台訂單管理中樞 (一列式棧板欄位修正版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen">
+
+    <header class="bg-slate-800/80 backdrop-blur-md border-b border-slate-700/60 sticky top-0 z-50 px-6 py-4 flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-900/30">
+                <i class="fa-solid fa-sitemap text-lg"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-black tracking-wider text-white">WMS 兩層式訂單管理中樞</h1>
+                <p class="text-xs text-indigo-400 font-medium">第一層：訂單大底數據維護 | 第二層：棧板細項一列式匯整 (精準欄位對接)</p>
+            </div>
+        </div>
+        <a href="index.html" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs">
+            <i class="fa-solid fa-arrow-left-long"></i> 返回中控首頁
+        </a>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
+
+        <div class="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-4 shadow-xl grid grid-cols-1 md:grid-cols-3 gap-4 items-end text-sm">
+            <div>
+                <label class="block text-xs font-bold text-slate-400 mb-1.5">起算日期 (START)</label>
+                <div class="relative cursor-pointer" onclick="document.getElementById('date-start').showPicker()">
+                    <input type="date" id="date-start" onclick="event.stopPropagation(); this.showPicker();" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500 cursor-pointer">
+                    <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 pointer-events-none"><i class="fa-solid fa-calendar-days"></i></span>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-400 mb-1.5">結束日期 (END)</label>
+                <div class="relative cursor-pointer" onclick="document.getElementById('date-end').showPicker()">
+                    <input type="date" id="date-end" onclick="event.stopPropagation(); this.showPicker();" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500 cursor-pointer">
+                    <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 pointer-events-none"><i class="fa-solid fa-calendar-days"></i></span>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="fetchOrdersByGroup()" class="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-950/40 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-magnifying-glass"></i> 查詢訂單
+                </button>
+                <button onclick="initDates(true)" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 h-11 rounded-xl transition-all cursor-pointer"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+            </div>
+        </div>
+
+        <div id="loader-status" class="hidden text-center py-16 space-y-3 bg-slate-800/20 rounded-2xl border border-dashed border-slate-700/60">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-3 border-indigo-500 border-t-transparent"></div>
+            <p class="text-xs text-slate-400 tracking-wider">正在利用資料庫外鍵串接技術，精準撈取訂單與一列式棧板報表...</p>
+        </div>
+
+        <div id="dashboard-content" class="space-y-4"></div>
+
+    </main>
+
+    <script>
+        const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
+
+        document.addEventListener("DOMContentLoaded", () => { 
+            initDates(false); 
+            fetchOrdersByGroup(); 
+        });
+
+        function initDates(forceRefetch) {
+            const today = new Date(); const start = new Date(); const end = new Date();
+            start.setDate(today.getDate() - 5); end.setDate(today.getDate() + 5);
+            document.getElementById("date-start").value = start.toISOString().split('T')[0];
+            document.getElementById("date-end").value = end.toISOString().split('T')[0];
+            if(forceRefetch) fetchOrdersByGroup();
+        }
+
+        // 📥 撈取資料並進行第一層訂單聚合
+        async function fetchOrdersByGroup() {
+            const start = document.getElementById("date-start").value;
+            const end = document.getElementById("date-end").value;
+            const loader = document.getElementById("loader-status");
+            const content = document.getElementById("dashboard-content");
+
+            if(!start || !end) return alert("請選擇日期");
+            content.innerHTML = ""; loader.classList.remove("hidden");
+
+            try {
+                const url = `${SUPABASE_URL}/rest/v1/pallet_orders?select=*,users(display_name)&ship_date=gte.${start}&ship_date=lte.${end}&order=id.asc`;
+                const res = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } });
+                if (!res.ok) throw new Error(await res.text());
+                const rawPallets = await res.json();
+
+                if(rawPallets.length === 0) {
+                    content.innerHTML = `<div class="text-center py-16 bg-slate-800/30 rounded-2xl border border-slate-800 border-dashed text-slate-500 italic text-sm"><i class="fa-solid fa-folder-open text-2xl mb-2 block"></i> 此區間內無任何訂單資料。</div>`;
+                    return;
+                }
+
+                const orderGroup = {};
+                rawPallets.forEach(pallet => {
+                    const orderNo = pallet.order_no || `ORD-${pallet.ship_vendor}-${pallet.ship_date}`;
+                    const orderKey = orderNo;
+                    
+                    if(!orderGroup[orderKey]) {
+                        orderGroup[orderKey] = {
+                            order_no: pallet.order_no || '未編號',
+                            order_id: pallet.order_id || null,
+                            ship_vendor: pallet.ship_vendor || '未知客戶',
+                            ship_date: pallet.ship_date,
+                            pallets: [],
+                            total_weight: 0,
+                            total_volume: 0,
+                            total_pieces: 0
+                        };
+                    }
+                    orderGroup[orderKey].pallets.push(pallet);
+                    orderGroup[orderKey].total_weight += (parseFloat(pallet.total_weight) || 0);
+                    // 第一層統計維持累加
+                    orderGroup[orderKey].total_volume += (parseFloat(pallet.total_cubic) || 0); 
+                    orderGroup[orderKey].total_pieces += (parseInt(pallet.total_pieces) || 0);
+                });
+
+                let orderIndex = 1;
+                for(let key in orderGroup) {
+                    const order = orderGroup[key];
+                    const orderDomId = `order-box-${orderIndex}`;
+                    const palletPanelId = `pallet-panel-${orderIndex}`;
+
+                    const orderCard = document.createElement("div");
+                    orderCard.className = "bg-slate-800/90 rounded-2xl border border-slate-700/60 shadow-lg p-4 transition-all space-y-4";
+                    orderCard.id = orderDomId;
+                    
+                    orderCard.innerHTML = `
+                        <div class="flex flex-wrap justify-between items-center gap-4 bg-slate-800 p-1 rounded-xl cursor-pointer" onclick="togglePalletPanel(${orderIndex})">
+                            <div class="flex items-center gap-3">
+                                <div class="w-11 h-11 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-file-invoice"></i></div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <h3 class="font-black text-white text-base tracking-wide">${order.ship_vendor}</h3>
+                                        <span class="text-[11px] font-mono bg-slate-900 px-2 py-0.5 rounded text-indigo-300 border border-slate-700/50">單號: ${order.order_no}</span>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-1">預計出貨日：<span class="font-mono text-slate-300 font-bold">${order.ship_date}</span> │ 包含棧板數：<span class="text-indigo-400 font-bold">${order.pallets.length} 個</span></p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-4 md:gap-6 bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-700/30 text-xs font-mono">
+                                <div class="text-center">
+                                    <span class="text-[10px] text-slate-500 block">總件數</span>
+                                    <span class="text-slate-200 font-bold text-sm">${order.total_pieces} <span class="text-[10px] font-normal text-slate-500">件</span></span>
+                                </div>
+                                <div class="w-px h-6 bg-slate-700/50"></div>
+                                <div class="text-center">
+                                    <span class="text-[10px] text-slate-500 block">總重量</span>
+                                    <span class="text-amber-400 font-bold text-sm">${order.total_weight.toFixed(1)} <span class="text-[10px] font-normal text-slate-500">kg</span></span>
+                                </div>
+                                <div class="w-px h-6 bg-slate-700/50"></div>
+                                <div class="text-center">
+                                    <span class="text-[10px] text-slate-500 block">總才積</span>
+                                    <span class="text-emerald-400 font-bold text-sm">${order.total_volume.toFixed(2)} <span class="text-[10px] font-normal text-slate-500">才</span></span>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-3" onclick="event.stopPropagation();">
+                                <button onclick="deleteEntireOrderGroup('${order.ship_vendor}', '${order.ship_date}', ${JSON.stringify(order.pallets.map(p=>p.id)).replace(/"/g, '&quot;')})" class="bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 text-xs px-3 py-2 rounded-xl font-bold transition-all flex items-center gap-1 cursor-pointer">
+                                    <i class="fa-solid fa-trash-can"></i> 刪除訂單
+                                </button>
+                                <div class="text-slate-500 pr-1 cursor-pointer" onclick="togglePalletPanel(${orderIndex})"><i class="fa-solid fa-chevron-down text-sm transition-transform duration-200" id="arrow-icon-${orderIndex}"></i></div>
+                            </div>
+                        </div>
+
+                        <div id="${palletPanelId}" class="hidden pl-4 pr-1 py-1 border-l-2 border-indigo-500/30 space-y-3 animate-fade-in">
+                        </div>
+                    `;
+                    content.appendChild(orderCard);
+
+                    const palletContainer = document.getElementById(palletPanelId);
+                    order.pallets.forEach(pallet => {
+                        const isRollbackable = (pallet.status === "撿貨中" || pallet.status === "已完成");
+                        let statusColor = "bg-slate-700/60 text-slate-400 border-slate-600/50";
+                        if(pallet.status === "待撿貨") statusColor = "bg-amber-500/10 text-amber-400 border-amber-500/30";
+                        if(pallet.status === "撿貨中") statusColor = "bg-blue-500/10 text-blue-400 border-blue-500/30 animate-pulse";
+                        if(pallet.status === "已完成") statusColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+
+                        // 👥 抓取外部人員顯示名稱
+                        let displayName = "無";
+                        if (pallet.users && pallet.users.display_name) {
+                            displayName = pallet.users.display_name;
+                        } else if (pallet.picker_id) {
+                            displayName = `工號:${pallet.picker_id}`;
+                        }
+
+                        // 📊 對接指定的資料欄位：total_cubic, space_ratio, total_pieces
+                        const weightVal = parseFloat(pallet.total_weight) || 0;
+                        const cubicVal = parseFloat(pallet.total_cubic) || 0;
+                        const piecesVal = parseInt(pallet.total_pieces) || 0;
+                        
+                        // 💡 將小數點 (例 0.46) 乘上 100 轉為整數百分比 (例 46%)
+                        let ratioStr = "0%";
+                        if (pallet.space_ratio !== null && pallet.space_ratio !== undefined) {
+                            const parsedRatio = parseFloat(pallet.space_ratio);
+                            if (!isNaN(parsedRatio)) {
+                                // 防呆：如果資料庫抓出來的已經是帶有 % 的字串，就直接沿用；如果是純小數，則乘以 100 並四捨五入
+                                ratioStr = String(pallet.space_ratio).includes('%') ? pallet.space_ratio : `${Math.round(parsedRatio * 100)}%`;
+                            }
+                        }
+                        // 計算總工時，如無數據自動顯示 00:00:00
+                        const totalDuration = calculateDuration(pallet.start_time, pallet.end_time);
+
+                        const palletCard = document.createElement("div");
+                        palletCard.className = "bg-slate-900/60 rounded-xl p-3 border border-slate-700/40 text-[11px] space-y-2.5 shadow-xs";
+                        palletCard.innerHTML = `
+                            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-800 pb-2">
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-300">
+                                    <span class="font-mono text-slate-100 font-black text-sm">
+                                        <i class="fa-solid fa-pallet text-slate-500 mr-1"></i>${pallet.pallet_no || '未編碼'}
+                                    </span>
+                                    <span class="text-indigo-400 font-bold">(撿貨人員: <span class="text-emerald-400 font-black">${displayName}</span>)</span>
+                                    <span class="text-slate-500">│</span>
+                                    <span>總件數: <span class="text-slate-100 font-bold">${piecesVal} 件</span></span>
+                                    <span class="text-slate-500">│</span>
+                                    <span>總重量: <span class="text-slate-100 font-bold">${weightVal} KG</span></span>
+                                    <span class="text-slate-500">│</span>
+                                    <span>總材積: <span class="text-slate-100 font-bold">${cubicVal} 才</span></span>
+                                    <span class="text-slate-500">│</span>
+                                    <span>容積比: <span class="text-amber-400 font-bold">${ratioStr}</span></span>
+                                    <span class="text-slate-500">│</span>
+                                    <span class="font-mono">開始時間: <span class="text-slate-200">${formatTime(pallet.start_time)}</span></span>
+                                    <span class="text-slate-500">│</span>
+                                    <span class="font-mono">結束時間: <span class="text-slate-200">${formatTime(pallet.end_time)}</span></span>
+                                    <span class="text-slate-500">│</span>
+                                    <span class="bg-indigo-950/60 border border-indigo-800/40 px-2 py-0.5 rounded text-indigo-300 font-mono">總工時: <span class="font-bold text-white">${totalDuration}</span></span>
+                                </div>
+                                
+                                <div class="flex items-center gap-1.5 ml-auto">
+                                    <span class="bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-slate-500 font-mono text-[10px]">ID: ${pallet.id}</span>
+                                    <span class="border px-2 py-0.5 rounded font-bold ${statusColor}">${pallet.status}</span>
+                                </div>
+                            </div>
+                            
+                            <div id="item-list-sub-${pallet.id}" class="bg-slate-950/40 p-2 rounded-lg border border-slate-900/80 divide-y divide-slate-900">
+                            </div>
+
+                            <div class="flex justify-end pt-0.5">
+                                <button onclick="rollbackPallet(${pallet.id}, '${pallet.pallet_no}', ${pallet.order_id || 'null'})" 
+                                        ${!isRollbackable ? 'disabled class="bg-slate-800 text-slate-600 border border-slate-700/20 px-2.5 py-1 rounded-md cursor-not-allowed"' : 'class="bg-amber-600 hover:bg-amber-700 text-slate-950 font-black px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer"'}>
+                                    <i class="fa-solid fa-arrow-rotate-left"></i> 退回未撿貨狀態
+                                </button>
+                            </div>
+                        `;
+                        palletContainer.appendChild(palletCard);
+                        fetchPalletItemsSub(pallet.id);
+                    });
+
+                    orderIndex++;
+                }
+
+            } catch (err) {
+                content.innerHTML = `<div class="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-xs font-mono">加載失敗: ${err.message}</div>`;
+            } finally { loader.classList.add("hidden"); }
+        }
+
+        // 📂 控制展開/收合
+        function togglePalletPanel(index) {
+            const panel = document.getElementById(`pallet-panel-${index}`);
+            const arrow = document.getElementById(`arrow-icon-${index}`);
+            if(panel.classList.contains("hidden")) {
+                panel.classList.remove("hidden"); arrow.classList.add("rotate-180");
+            } else {
+                panel.classList.add("hidden"); arrow.classList.remove("rotate-180");
+            }
+        }
+
+        // 📥 加載底層物料細節
+        async function fetchPalletItemsSub(palletId) {
+            const container = document.getElementById(`item-list-sub-${palletId}`);
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/pallet_items?order_pallet_id=eq.${palletId}&order=id.asc`, { headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } });
+                const items = await res.json();
+                if(items.length === 0) { container.innerHTML = `<div class="text-slate-600 italic p-1">無品項資料</div>`; return; }
+                container.innerHTML = "";
+                items.forEach((item, i) => {
+                    const row = document.createElement("div");
+                    row.className = "py-1 flex justify-between items-center text-[11px]";
+                    row.innerHTML = `
+                        <div class="text-slate-300">${i+1}. <span class="font-bold text-slate-200">${item.item_no}</span> │ ${item.item_spec || ''} │ 效期: <span class="${item.exp_date!==item.ori_date?'text-amber-400 font-bold':''}">${item.exp_date}</span></div>
+                        <div class="text-slate-400 font-mono">進度: <span class="text-white font-bold">${item.qty_picked_pcs}</span>/${item.qty_target_pcs} 件 │ <span class="${item.status==='已完成'?'text-emerald-400':'text-slate-500'}">${item.status}</span></div>
+                    `;
+                    container.appendChild(row);
+                });
+            } catch(e) { container.innerHTML = `<div class="text-red-400">無法讀取明細</div>`; }
+        }
+
+        // ❌ 刪除整筆訂單
+        async function deleteEntireOrderGroup(vendor, date, palletIds) {
+            if(!confirm(`🚨 永久刪除訂單核心警告！\n\n確定要永久刪除客戶 [ ${vendor} ] 的整筆訂單嗎？\n這將一併永久刪除底下的 ${palletIds.length} 個棧板以及所有關聯物料，資料將完全抹除！`)) return;
+
+            try {
+                for(let pid of palletIds) {
+                    await fetch(`${SUPABASE_URL}/rest/v1/pallet_items?order_pallet_id=eq.${pid}`, { method: "DELETE", headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } });
+                    await fetch(`${SUPABASE_URL}/rest/v1/pallet_orders?id=eq.${pid}`, { method: "DELETE", headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } });
+                }
+                alert(`🗑️ 該訂單及其附屬的 ${palletIds.length} 個棧板已完全永久刪除！`);
+                fetchOrdersByGroup();
+            } catch (err) { alert(`刪除異常：${err.message}`); }
+        }
+
+        // 🔄 退回未撿貨狀態
+        async function rollbackPallet(palletId, palletNo, orderId) {
+            if(!confirm(`⚠️ 確定要將棧板 [ ${palletNo} ] 退回待撿貨狀態嗎？`)) return;
+
+            try {
+                const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/pallet_orders?id=eq.${palletId}`, {
+                    method: "PATCH",
+                    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "待撿貨", start_time: null, end_time: null, picker_id: null })
+                });
+                if(!orderRes.ok) throw new Error("主檔更新失敗");
+
+                const itemsRes = await fetch(`${SUPABASE_URL}/rest/v1/pallet_items?order_pallet_id=eq.${palletId}`, { headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } });
+                const currentItems = await itemsRes.json();
+
+                for(let item of currentItems) {
+                    await fetch(`${SUPABASE_URL}/rest/v1/pallet_items?id=eq.${item.id}`, {
+                        method: "PATCH",
+                        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+                        body: JSON.stringify({ status: "待撿貨", qty_picked_pcs: 0, exp_date: item.ori_date })
+                    });
+                }
+
+                if(orderId) {
+                    try {
+                        const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=pallets_picked`, {
+                            headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+                        });
+                        
+                        if(checkRes.ok) {
+                            const orderRecord = await checkRes.json();
+                            if(orderRecord && orderRecord.length > 0) {
+                                const currentPicked = parseInt(orderRecord[0].pallets_picked) || 0;
+                                const updatedPicked = Math.max(0, currentPicked - 1);
+                                
+                                await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}`, {
+                                    method: "PATCH",
+                                    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+                                    body: JSON.stringify({ pallets_picked: updatedPicked })
+                                });
+                            }
+                        }
+                    } catch(orderErr) {
+                        console.error("同步更新訂單完工進度時發生非預期錯誤:", orderErr);
+                    }
+                }
+
+                alert(`🎉 棧板 [ ${palletNo} ] 已成功退回未撿貨狀態，波次單據完工進度已同步更新！`);
+                fetchOrdersByGroup();
+            } catch (err) { alert(`退回失敗：${err.message}`); }
+        }
+
+        // ⏱️ 格式化時間區塊（如無數據預設秀出 00:00:00）
+        function formatTime(isoString) {
+            if(!isoString) return `00:00:00`;
+            try { 
+                const d = new Date(isoString);
+                return d.toTimeString().split(' ')[0]; 
+            } catch(e) { return `00:00:00`; }
+        }
+
+        // 🧮 自動計算總工時函數（如無數據預設秀出 00:00:00）
+        function calculateDuration(startIso, endIso) {
+            if (!startIso || !endIso) return "00:00:00";
+            try {
+                const diffMs = new Date(endIso) - new Date(startIso);
+                if (diffMs <= 0) return "00:00:00";
+                
+                const totalSecs = Math.floor(diffMs / 1000);
+                const hrs = Math.floor(totalSecs / 3600).toString().padStart(2, '0');
+                const mins = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
+                const secs = (totalSecs % 60).toString().padStart(2, '0');
+                
+                return `${hrs}:${mins}:${secs}`;
+            } catch (e) {
+                return "00:00:00";
+            }
+        }
+    </script>
+</body>
+</html>

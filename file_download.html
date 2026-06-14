@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS 核心營運文件下載專區</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8 flex items-center justify-center">
+
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.15),transparent_45%)] pointer-events-none"></div>
+
+    <div class="max-w-xl w-full space-y-6 relative z-10">
+        
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-800/60 p-4 rounded-2xl border border-slate-700/50 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-cyan-500/20 text-cyan-400 p-3 rounded-xl border border-cyan-500/30">
+                    <i class="fa-solid fa-cloud-arrow-down text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-black tracking-wider text-slate-100">核心營運文件下載</h1>
+                    <p class="text-xs text-slate-400">登入權限：<span id="user-display" class="text-cyan-400 font-mono font-bold">驗證中...</span></p>
+                </div>
+            </div>
+            <a href="index.html" class="text-xs bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-xl text-slate-300 hover:text-white font-medium transition-all cursor-pointer">
+                <i class="fa-solid fa-arrow-left mr-1"></i> 回主選單
+            </a>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700/60 shadow-xl space-y-4">
+            <h2 class="text-xs font-bold text-slate-400 tracking-wider mb-2 flex items-center gap-1.5">
+                <i class="fa-solid fa-file-shield text-cyan-400"></i> 請選擇欲下載的系統或主檔資料
+            </h2>
+
+            <div class="space-y-3" id="download-list">
+
+                <a href="files/%E6%97%A5%E6%AD%A3%E6%A3%A7%E6%9D%BF%E5%A0%86%E5%A3%98%E7%B3%BB%E7%B5%B1-20260612-%E6%9C%AC%E6%A9%9F.xlsm" download class="flex items-center gap-4 bg-slate-900/60 hover:bg-slate-900 p-4 rounded-xl border border-slate-800 hover:border-cyan-500/40 shadow-sm transition-all group cursor-pointer">
+                    <div class="bg-amber-500/10 text-amber-400 p-3 rounded-xl group-hover:scale-105 transition-transform">
+                        <i class="fa-regular fa-file-excel text-xl"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-bold text-slate-200 group-hover:text-cyan-400 transition-colors truncate">1. 單機作業排板系統</h3>
+                        <p class="text-[11px] text-slate-500 font-mono mt-0.5 truncate">files/日正棧板堆壘系統-20260612-本機.xlsm</p>
+                    </div>
+                    <div class="text-slate-600 group-hover:text-cyan-400 transition-all px-2 text-xs font-semibold flex items-center gap-1">
+                        <span>下載</span> <i class="fa-solid fa-download animate-pulse"></i>
+                    </div>
+                </a>
+
+                <a href="files/%E6%97%A5%E6%AD%A3%E6%A3%A7%E6%9D%BF%E5%A0%86%E5%A3%98%E7%B3%BB%E7%B5%B1-20260613-%E9%9B%B2%E7%AB%AF.xlsm" download class="flex items-center gap-4 bg-slate-900/60 hover:bg-slate-900 p-4 rounded-xl border border-slate-800 hover:border-cyan-500/40 shadow-sm transition-all group cursor-pointer">
+                    <div class="bg-emerald-500/10 text-emerald-400 p-3 rounded-xl group-hover:scale-105 transition-transform">
+                        <i class="fa-regular fa-file-excel text-xl"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-bold text-slate-200 group-hover:text-cyan-400 transition-colors truncate">2. 產品雲端排板系統</h3>
+                        <p class="text-[11px] text-slate-500 font-mono mt-0.5 truncate">files/日正棧板堆壘系統-20260613-雲端.xlsm</p>
+                    </div>
+                    <div class="text-slate-600 group-hover:text-cyan-400 transition-all px-2 text-xs font-semibold flex items-center gap-1">
+                        <span>下載</span> <i class="fa-solid fa-download animate-pulse"></i>
+                    </div>
+                </a>
+
+                <button id="btn-export-supabase" onclick="downloadSupabaseProducts()" class="w-full flex items-center gap-4 bg-slate-900/60 hover:bg-slate-900 p-4 rounded-xl border border-slate-800 hover:border-cyan-500/40 shadow-sm transition-all group cursor-pointer text-left">
+                    <div class="bg-cyan-500/10 text-cyan-400 p-3 rounded-xl group-hover:scale-105 transition-transform">
+                        <i class="fa-solid fa-database text-xl"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-bold text-slate-200 group-hover:text-cyan-400 transition-colors truncate">3. 產品主檔即時下載</h3>
+                        <p id="export-status" class="text-[11px] text-slate-400 font-mono mt-0.5 truncate">從 Supabase 雲端即時串接轉換成 Excel 中文檔</p>
+                    </div>
+                    <div class="text-cyan-500 px-2 text-xs font-semibold flex items-center gap-1">
+                        <span>匯出</span> <i class="fa-solid fa-file-export"></i>
+                    </div>
+                </button>
+
+            </div>
+        </div>
+
+        <p class="text-center text-[11px] text-slate-600 font-mono">Secure Document Distribution Network | © 2026 WMS Control.</p>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
+
+        // 初始化讀取網址列傳遞過來的操作人員與身分
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentOperator = urlParams.get("username") || "進階同仁";
+        const currentRole = (urlParams.get("role") || "user").trim().toLowerCase();
+
+        document.addEventListener("DOMContentLoaded", () => {
+            // 顯示精確的使用者名稱與職稱
+            const roleBadge = (currentRole === 'admin') ? '系統管理員' : '主管';
+            document.getElementById("user-display").innerText = `${currentOperator} (${roleBadge})`;
+        });
+
+        // 🎯 核心功能：連線 Supabase 下載 products 並轉換中文欄位轉存為 Excel
+        async function downloadSupabaseProducts() {
+            const btn = document.getElementById("btn-export-supabase");
+            const statusText = document.getElementById("export-status");
+
+            // 1. 防重複點擊狀態調整
+            btn.disabled = true;
+            statusText.innerText = "⏳ 正在連線 Supabase 雲端資料庫...";
+            statusText.classList.remove("text-slate-400");
+            statusText.classList.add("text-yellow-400");
+
+            try {
+                // 2. 向 Supabase 撈取完整 products 資料
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
+                    headers: {
+                        "apikey": SUPABASE_KEY,
+                        "Authorization": `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+
+                if (!response.ok) throw new Error("資料庫連線回應異常");
+                const rawData = await response.json();
+
+                if (!rawData || rawData.length === 0) {
+                    alert("⚠️ 雲端資料庫中目前沒有任何產品數據。");
+                    return;
+                }
+
+                // 3. 欄位名稱轉換字典（將英文代碼轉為親切的繁體中文）
+                const fieldMapping = {
+                    "item_no": "產品品號",
+                    "item_name": "產品品名",
+                    "spec": "產品規格",
+                    "pack_qty": "入數(包/箱)",
+                    "pallets_box_qty": "每板標準箱數",
+                    "base_qty": "每層底數",
+                    "cubic_per_box": "才積/箱(Cubic)",
+                    "gross_weight": "單箱毛重(kg)",
+                    "length": "外箱長度(cm)",
+                    "width": "外箱寬度(cm)",
+                    "height": "外箱高度(cm)",
+                    "shelf_life": "保存年限",
+                    "updated_at": "最後同步時間",
+                    "updated_by": "最後修改人員"
+                };
+
+                // 4. 對資料進行重新加工對照
+                const translatedData = rawData.map(item => {
+                    let newItem = {};
+                    // 依據我們定義的中文順序進行產出
+                    Object.keys(fieldMapping).forEach(engKey => {
+                        if (item[engKey] !== undefined) {
+                            newItem[fieldMapping[engKey]] = item[engKey];
+                        }
+                    });
+                    return newItem;
+                });
+
+                // 5. 使用 SheetJS (XLSX) 將 JSON 資料封裝成標準 Excel 活頁簿
+                const worksheet = XLSX.utils.json_to_sheet(translatedData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Products_List");
+
+                // 6. 📅 計算今日日期 (格式為 YYYYMMDD)
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const formattedDate = `${yyyy}${mm}${dd}`;
+
+                // 組合您要求的規格檔名：產品主檔案+日期.xlsx (例如: 產品主檔案_20260614.xlsx)
+                const finalFileName = `產品主檔案_${formattedDate}.xlsx`;
+
+                // 7. 觸發瀏覽器下載
+                XLSX.writeFile(workbook, finalFileName);
+
+                // 恢復原先狀態
+                statusText.innerText = `🎉 成功匯出 ${finalFileName}！`;
+                statusText.classList.remove("text-yellow-400");
+                statusText.classList.add("text-emerald-400");
+
+            } catch (err) {
+                alert(`❌ 匯出失敗：${err.message}`);
+                statusText.innerText = "發生技術錯誤，請重試。";
+                statusText.classList.remove("text-yellow-400");
+                statusText.classList.add("text-rose-400");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
