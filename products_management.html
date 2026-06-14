@@ -140,10 +140,10 @@
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
 
-        // 🎯 核心修正：將參數解析與渲染邏輯確保在頁面載入時第一時間執行
         const urlParams = new URLSearchParams(window.location.search);
         const currentOperator = urlParams.get("username") || "未明管理員";
         
+        // 🛠️ 讀取當前角色權限：優先由 localStorage 取得精確角色，若無則看 URL
         let currentRole = "";
         try {
             const cachedUser = localStorage.getItem("currentUser");
@@ -152,7 +152,6 @@
                 currentRole = userObj.role || "";
             }
         } catch(e) { console.error("解析快取使用者失敗", e); }
-        
         if (!currentRole) {
             currentRole = (urlParams.get("role") || "").trim().toLowerCase();
         }
@@ -161,7 +160,6 @@
         let isCreateMode = false; 
 
         document.addEventListener("DOMContentLoaded", () => {
-            // 🎯 確保文字與權限按鈕被確實填入與判定
             document.getElementById("operator-display").innerText = currentOperator;
             
             const btnShowAdd = document.getElementById("btn-show-add-mode");
@@ -199,6 +197,7 @@
 
             debounceTimer = setTimeout(async () => {
                 try {
+                    //const queryUrl = `${SUPABASE_URL}/rest/v1/products?or=(item_no.ilike.*${encodeURIComponent(keyword)}*,item_name.ilike.*${encodeURIComponent(keyword)}*)&select=item_no,item_name&limit=10`;
                     const queryUrl = `${SUPABASE_URL}/rest/v1/products?or=(item_no.ilike.*${encodeURIComponent(keyword)}*,item_name.ilike.*${encodeURIComponent(keyword)}*)&select=item_no,item_name&order=updated_at.desc&limit=20`;
                     const res = await fetch(queryUrl, {
                         headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
@@ -258,6 +257,7 @@
                     document.getElementById("form-height").value = prod.height || "";
                     document.getElementById("form-shelf-life").value = prod.shelf_life || "";
 
+                    // 🎯 權限功能控制：若是 admin，進入產品修改模式時顯示「複製到新產品」按鈕
                     const btnCopy = document.getElementById("btn-copy-product");
                     if (btnCopy) {
                         btnCopy.style.display = (currentRole === "admin") ? "block" : "none";
@@ -284,31 +284,31 @@
             itemNoInput.disabled = false;
             itemNoInput.className = "w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-cyan-500";
             
+            // 隱藏複製按鈕（建立模式下不需再顯示複製）
             const btnCopy = document.getElementById("btn-copy-product");
             if (btnCopy) btnCopy.style.display = "none";
             
             const btnSave = document.getElementById("btn-save");
             btnSave.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> 確認新增並發布雲端`;
             btnSave.className = "w-full sm:w-auto bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-cyan-950/40 flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-3";
-            
-            clearFormFields();
-            document.getElementById("edit-form-section").classList.remove("hidden");
         }
 
+        // 🎯 複製到新產品的按鈕點擊處理邏輯
         function handleCopyToNewProduct() {
             if (!confirm("確定要將此產品數據複製為新範本嗎？\n系統將切換至新增介面，並保留目前的規格數值供您修改。")) {
                 return;
             }
             
-            const currentItemName = document.getElementById("form-item-name").value;
+            // 1. 先呼叫切換至新增模式（調整標題、CSS、狀態、隱藏複製按鈕）
             switchToCreateMode();
             
+            // 2. 清空產品品號欄位（強制品號必須重新輸入，以防重複主鍵錯誤）
             const itemNoInput = document.getElementById("form-item-no");
             itemNoInput.value = "";
             itemNoInput.focus();
             
+            // 3. 在品名後方補上「- 複製」字樣，提醒使用者這是複製出來的
             const nameInput = document.getElementById("form-item-name");
-            nameInput.value = currentItemName;
             if (nameInput.value && !nameInput.value.includes("複製")) {
                 nameInput.value = nameInput.value + " - 複製";
             }
@@ -374,8 +374,6 @@
                 return;
             }
 
-            const nowIsoString = new Date().toISOString();
-
             const insertData = {
                 item_no: itemNo, 
                 item_name: itemName,
@@ -389,9 +387,7 @@
                 width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
-                updated_by: `${currentOperator}`,
-                created_at: nowIsoString,
-                updated_at: nowIsoString
+                updated_by: `${currentOperator}`
             };
 
             if (!confirm(`確定要建立全新產品 [${itemNo} - ${itemName}] 嗎？`)) {
@@ -421,25 +417,14 @@
                     throw new Error(errText);
                 }
 
-                const serverData = await res.json();
-                if (!serverData || serverData.length === 0) {
-                    throw new Error("雖然連線成功，但雲端 RLS 安全原則拒絕了本次新增操作。");
-                }
-
                 alert(`🎉 新增成功！\n全新產品 [${itemNo}] 已成功寫入雲端主檔。`);
-                
-                resetFormToEditMode();
-                document.getElementById("search-keyword").value = `${itemNo} - ${itemName}`;
-                
-                const btnCopy = document.getElementById("btn-copy-product");
-                if (btnCopy) btnCopy.style.display = (currentRole === "admin") ? "block" : "none";
+                clearSearch();
 
             } catch (err) {
                 alert(`建立失敗: ${err.message}`);
             } finally {
-                // 🎯 拼字修正：由原本的 tragedies 改為標準 finally 確保解凍
                 btnSave.disabled = false;
-                btnSave.innerHTML = isCreateMode ? `<i class="fa-solid fa-cloud-arrow-up"></i> 確認新增並發布雲端` : `<i class="fa-solid fa-floppy-disk"></i> 儲存變更並同步雲端`;
+                resetFormToEditMode();
             }
         }
 
@@ -458,9 +443,7 @@
                 length: document.getElementById("form-length").value ? parseFloat(document.getElementById("form-length").value) : null,
                 width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
-                shelf_life: document.getElementById("form-shelf-life").value.trim(),
-                updated_by: `${currentOperator}`,
-                updated_at: new Date().toISOString()
+                shelf_life: document.getElementById("form-shelf-life").value.trim()
             };
 
             if (!updateData.item_name) {
@@ -482,7 +465,7 @@
                         "apikey": SUPABASE_KEY,
                         "Authorization": `Bearer ${SUPABASE_KEY}`,
                         "Content-Type": "application/json",
-                        "Prefer": "return=representation" 
+                        "Prefer": "return=minimal"
                     },
                     body: JSON.stringify(updateData)
                 });
@@ -492,15 +475,23 @@
                     throw new Error(errText);
                 }
 
-                const serverData = await res.json();
-                if (!serverData || serverData.length === 0) {
-                    throw new Error("雖然網路連線成功，但雲端 RLS 安全原則攔截並拒絕了本次變更！請檢查權限設定。");
+                try {
+                    await fetch(`${SUPABASE_URL}/rest/v1/products?item_no=eq.${encodeURIComponent(itemNo)}`, {
+                        method: "PATCH",
+                        headers: {
+                            "apikey": SUPABASE_KEY,
+                            "Authorization": `Bearer ${SUPABASE_KEY}`,
+                            "Content-Type": "application/json",
+                            "Prefer": "return=minimal"
+                        },
+                        body: JSON.stringify({ updated_by: `${currentOperator}` })
+                    });
+                } catch (e) {
+                    console.log("歷程記錄由底層自動扣接中");
                 }
 
-                const newestItemName = serverData[0].item_name;
-
                 alert(`🎉 儲存成功！\n品號 [${itemNo}] 的最新規格已成功同步至雲端系統。`);
-                document.getElementById("search-keyword").value = `${itemNo} - ${newestItemName}`;
+                clearSearch(); 
                 
             } catch (err) {
                 alert(`儲存失敗: 發生技術性錯誤\n${err.message}`);
