@@ -196,7 +196,7 @@
 
             debounceTimer = setTimeout(async () => {
                 try {
-                    // 🎯 調整亮點：使用精準 order 條件並擴充至 20 筆，最新修訂或建立的產品一定排在上方
+                    // 🎯 採用正確的更新日期倒序 (updated_at.desc)，且放寬容納上限至 20 筆
                     const queryUrl = `${SUPABASE_URL}/rest/v1/products?or=(item_no.ilike.*${encodeURIComponent(keyword)}*,item_name.ilike.*${encodeURIComponent(keyword)}*)&select=item_no,item_name&order=updated_at.desc&limit=20`;
                     const res = await fetch(queryUrl, {
                         headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
@@ -372,6 +372,7 @@
                 return;
             }
 
+            // 取得目前精確的 ISO 台北時間戳記
             const nowIsoString = new Date().toISOString();
 
             const insertData = {
@@ -388,7 +389,7 @@
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
                 updated_by: `${currentOperator}`,
-                // 🎯 核心修改：建立新記錄時，同步附加 created_at 與 updated_at 時間戳記
+                // 🎯 關鍵附加：新增記錄時同步填入建立時間與修訂時間
                 created_at: nowIsoString,
                 updated_at: nowIsoString
             };
@@ -427,7 +428,7 @@
 
                 alert(`🎉 新增成功！\n全新產品 [${itemNo}] 已成功寫入雲端主檔。`);
                 
-                // 🎯 體驗優化：新增成功後不關閉表單，自動切為「編輯/鎖定」狀態，並保持即時可查閱狀態
+                // 新增成功後自動轉換為鎖定編輯狀態，不關閉表單，維持最直覺同步
                 resetFormToEditMode();
                 document.getElementById("search-keyword").value = `${itemNo} - ${itemName}`;
                 
@@ -436,7 +437,7 @@
 
             } catch (err) {
                 alert(`建立失敗: ${err.message}`);
-            } finaly {
+            } tragedies {
                 btnSave.disabled = false;
             }
         }
@@ -458,7 +459,7 @@
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
                 updated_by: `${currentOperator}`,
-                // 🎯 核心修改：修改產品時，自動更新 updated_at 時間戳記 (created_at 則維持原樣不更動)
+                // 🎯 關鍵附加：修改時只同步更新更新時間戳記 (created_at 欄位自動維持原始狀態)
                 updated_at: new Date().toISOString()
             };
 
@@ -481,7 +482,7 @@
                         "apikey": SUPABASE_KEY,
                         "Authorization": `Bearer ${SUPABASE_KEY}`,
                         "Content-Type": "application/json",
-                        "Prefer": "return=representation" // 強迫要求伺服器回傳更新後的完整資料列，阻斷假成功
+                        "Prefer": "return=representation" 
                     },
                     body: JSON.stringify(updateData)
                 });
@@ -500,7 +501,7 @@
 
                 alert(`🎉 儲存成功！\n品號 [${itemNo}] 的最新規格已成功同步至雲端系統。`);
                 
-                // 🎯【體驗修復】：成功後不呼叫 clearSearch()，而是精確同步更新第一步的文字，讓搜尋功能不中斷
+                // 體驗修復：儲存成功後更新上方的輸入欄位文字，下拉式聯想功能將不會斷線
                 document.getElementById("search-keyword").value = `${itemNo} - ${newestItemName}`;
                 
             } catch (err) {
