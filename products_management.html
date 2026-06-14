@@ -143,7 +143,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const currentOperator = urlParams.get("username") || "未明管理員";
         
-        // 🛠️ 讀取當前角色權限：優先由 localStorage 取得精確角色，若無則看 URL
         let currentRole = "";
         try {
             const cachedUser = localStorage.getItem("currentUser");
@@ -197,7 +196,6 @@
 
             debounceTimer = setTimeout(async () => {
                 try {
-                    //const queryUrl = `${SUPABASE_URL}/rest/v1/products?or=(item_no.ilike.*${encodeURIComponent(keyword)}*,item_name.ilike.*${encodeURIComponent(keyword)}*)&select=item_no,item_name&limit=10`;
                     const queryUrl = `${SUPABASE_URL}/rest/v1/products?or=(item_no.ilike.*${encodeURIComponent(keyword)}*,item_name.ilike.*${encodeURIComponent(keyword)}*)&select=item_no,item_name&order=updated_at.desc&limit=20`;
                     const res = await fetch(queryUrl, {
                         headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
@@ -257,7 +255,6 @@
                     document.getElementById("form-height").value = prod.height || "";
                     document.getElementById("form-shelf-life").value = prod.shelf_life || "";
 
-                    // 🎯 權限功能控制：若是 admin，進入產品修改模式時顯示「複製到新產品」按鈕
                     const btnCopy = document.getElementById("btn-copy-product");
                     if (btnCopy) {
                         btnCopy.style.display = (currentRole === "admin") ? "block" : "none";
@@ -284,31 +281,31 @@
             itemNoInput.disabled = false;
             itemNoInput.className = "w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-cyan-500";
             
-            // 隱藏複製按鈕（建立模式下不需再顯示複製）
             const btnCopy = document.getElementById("btn-copy-product");
             if (btnCopy) btnCopy.style.display = "none";
             
             const btnSave = document.getElementById("btn-save");
             btnSave.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> 確認新增並發布雲端`;
             btnSave.className = "w-full sm:w-auto bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-cyan-950/40 flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-3";
+            
+            clearFormFields();
+            document.getElementById("edit-form-section").classList.remove("hidden");
         }
 
-        // 🎯 複製到新產品的按鈕點擊處理邏輯
         function handleCopyToNewProduct() {
             if (!confirm("確定要將此產品數據複製為新範本嗎？\n系統將切換至新增介面，並保留目前的規格數值供您修改。")) {
                 return;
             }
             
-            // 1. 先呼叫切換至新增模式（調整標題、CSS、狀態、隱藏複製按鈕）
+            const currentItemName = document.getElementById("form-item-name").value;
             switchToCreateMode();
             
-            // 2. 清空產品品號欄位（強制品號必須重新輸入，以防重複主鍵錯誤）
             const itemNoInput = document.getElementById("form-item-no");
             itemNoInput.value = "";
             itemNoInput.focus();
             
-            // 3. 在品名後方補上「- 複製」字樣，提醒使用者這是複製出來的
             const nameInput = document.getElementById("form-item-name");
+            nameInput.value = currentItemName;
             if (nameInput.value && !nameInput.value.includes("複製")) {
                 nameInput.value = nameInput.value + " - 複製";
             }
@@ -374,6 +371,7 @@
                 return;
             }
 
+            // ✨ 先前可行的乾淨架構，僅在 insertData 內安全地加上 created_at
             const insertData = {
                 item_no: itemNo, 
                 item_name: itemName,
@@ -387,7 +385,8 @@
                 width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
-                updated_by: `${currentOperator}`
+                updated_by: `${currentOperator}`,
+                created_at: new Date().toISOString() // 🎯 依要求加上：新增時建立時間
             };
 
             if (!confirm(`確定要建立全新產品 [${itemNo} - ${itemName}] 嗎？`)) {
@@ -404,7 +403,7 @@
                         "apikey": SUPABASE_KEY,
                         "Authorization": `Bearer ${SUPABASE_KEY}`,
                         "Content-Type": "application/json",
-                        "Prefer": "return=representation"
+                        "Prefer": "return=minimal"
                     },
                     body: JSON.stringify(insertData)
                 });
@@ -432,6 +431,7 @@
             const itemNo = document.getElementById("form-item-no").value;
             const btnSave = document.getElementById("btn-save");
 
+            // ✨ 回復先前完全可行的基本更新包架構，並僅安全地在內層加上 updated_at
             const updateData = {
                 item_name: document.getElementById("form-item-name").value.trim(),
                 spec: document.getElementById("form-spec").value.trim(),
@@ -443,7 +443,9 @@
                 length: document.getElementById("form-length").value ? parseFloat(document.getElementById("form-length").value) : null,
                 width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
-                shelf_life: document.getElementById("form-shelf-life").value.trim()
+                shelf_life: document.getElementById("form-shelf-life").value.trim(),
+                updated_by: `${currentOperator}`,
+                updated_at: new Date().toISOString() // 🎯 依要求加上：修改時更新時間
             };
 
             if (!updateData.item_name) {
@@ -459,6 +461,7 @@
             btnSave.innerHTML = `<i class="fa-solid fa-spinner animate-spin mr-2"></i> 正在上傳至雲端...`;
 
             try {
+                // 回復最原本可行的單次呼叫，不再混入會導致 RLS 衝突的欄位
                 const res = await fetch(`${SUPABASE_URL}/rest/v1/products?item_no=eq.${encodeURIComponent(itemNo)}`, {
                     method: "PATCH",
                     headers: {
@@ -473,21 +476,6 @@
                 if (!res.ok) {
                     const errText = await res.text();
                     throw new Error(errText);
-                }
-
-                try {
-                    await fetch(`${SUPABASE_URL}/rest/v1/products?item_no=eq.${encodeURIComponent(itemNo)}`, {
-                        method: "PATCH",
-                        headers: {
-                            "apikey": SUPABASE_KEY,
-                            "Authorization": `Bearer ${SUPABASE_KEY}`,
-                            "Content-Type": "application/json",
-                            "Prefer": "return=minimal"
-                        },
-                        body: JSON.stringify({ updated_by: `${currentOperator}` })
-                    });
-                } catch (e) {
-                    console.log("歷程記錄由底層自動扣接中");
                 }
 
                 alert(`🎉 儲存成功！\n品號 [${itemNo}] 的最新規格已成功同步至雲端系統。`);
