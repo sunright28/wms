@@ -140,6 +140,7 @@
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
 
+        // 🎯 核心修正：將參數解析與渲染邏輯確保在頁面載入時第一時間執行
         const urlParams = new URLSearchParams(window.location.search);
         const currentOperator = urlParams.get("username") || "未明管理員";
         
@@ -151,6 +152,7 @@
                 currentRole = userObj.role || "";
             }
         } catch(e) { console.error("解析快取使用者失敗", e); }
+        
         if (!currentRole) {
             currentRole = (urlParams.get("role") || "").trim().toLowerCase();
         }
@@ -159,6 +161,7 @@
         let isCreateMode = false; 
 
         document.addEventListener("DOMContentLoaded", () => {
+            // 🎯 確保文字與權限按鈕被確實填入與判定
             document.getElementById("operator-display").innerText = currentOperator;
             
             const btnShowAdd = document.getElementById("btn-show-add-mode");
@@ -196,7 +199,6 @@
 
             debounceTimer = setTimeout(async () => {
                 try {
-                    // 🎯 採用正確的更新日期倒序 (updated_at.desc)，且放寬容納上限至 20 筆
                     const queryUrl = `${SUPABASE_URL}/rest/v1/products?or=(item_no.ilike.*${encodeURIComponent(keyword)}*,item_name.ilike.*${encodeURIComponent(keyword)}*)&select=item_no,item_name&order=updated_at.desc&limit=20`;
                     const res = await fetch(queryUrl, {
                         headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
@@ -372,7 +374,6 @@
                 return;
             }
 
-            // 取得目前精確的 ISO 台北時間戳記
             const nowIsoString = new Date().toISOString();
 
             const insertData = {
@@ -389,7 +390,6 @@
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
                 updated_by: `${currentOperator}`,
-                // 🎯 關鍵附加：新增記錄時同步填入建立時間與修訂時間
                 created_at: nowIsoString,
                 updated_at: nowIsoString
             };
@@ -428,7 +428,6 @@
 
                 alert(`🎉 新增成功！\n全新產品 [${itemNo}] 已成功寫入雲端主檔。`);
                 
-                // 新增成功後自動轉換為鎖定編輯狀態，不關閉表單，維持最直覺同步
                 resetFormToEditMode();
                 document.getElementById("search-keyword").value = `${itemNo} - ${itemName}`;
                 
@@ -437,8 +436,10 @@
 
             } catch (err) {
                 alert(`建立失敗: ${err.message}`);
-            } tragedies {
+            } finally {
+                // 🎯 拼字修正：由原本的 tragedies 改為標準 finally 確保解凍
                 btnSave.disabled = false;
+                btnSave.innerHTML = isCreateMode ? `<i class="fa-solid fa-cloud-arrow-up"></i> 確認新增並發布雲端` : `<i class="fa-solid fa-floppy-disk"></i> 儲存變更並同步雲端`;
             }
         }
 
@@ -459,7 +460,6 @@
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
                 updated_by: `${currentOperator}`,
-                // 🎯 關鍵附加：修改時只同步更新更新時間戳記 (created_at 欄位自動維持原始狀態)
                 updated_at: new Date().toISOString()
             };
 
@@ -500,8 +500,6 @@
                 const newestItemName = serverData[0].item_name;
 
                 alert(`🎉 儲存成功！\n品號 [${itemNo}] 的最新規格已成功同步至雲端系統。`);
-                
-                // 體驗修復：儲存成功後更新上方的輸入欄位文字，下拉式聯想功能將不會斷線
                 document.getElementById("search-keyword").value = `${itemNo} - ${newestItemName}`;
                 
             } catch (err) {
