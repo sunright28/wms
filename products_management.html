@@ -143,7 +143,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const currentOperator = urlParams.get("username") || "未明管理員";
         
-        // 🛠️ 讀取當前角色權限：優先由 localStorage 取得精確角色，若無則看 URL
         let currentRole = "";
         try {
             const cachedUser = localStorage.getItem("currentUser");
@@ -197,7 +196,7 @@
 
             debounceTimer = setTimeout(async () => {
                 try {
-                    //const queryUrl = `${SUPABASE_URL}/rest/v1/products?or=(item_no.ilike.*${encodeURIComponent(keyword)}*,item_name.ilike.*${encodeURIComponent(keyword)}*)&select=item_no,item_name&limit=10`;
+                    // 🎯 調整亮點：使用精準 order 條件並擴充至 20 筆，最新修訂或建立的產品一定排在上方
                     const queryUrl = `${SUPABASE_URL}/rest/v1/products?or=(item_no.ilike.*${encodeURIComponent(keyword)}*,item_name.ilike.*${encodeURIComponent(keyword)}*)&select=item_no,item_name&order=updated_at.desc&limit=20`;
                     const res = await fetch(queryUrl, {
                         headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
@@ -257,7 +256,6 @@
                     document.getElementById("form-height").value = prod.height || "";
                     document.getElementById("form-shelf-life").value = prod.shelf_life || "";
 
-                    // 🎯 權限功能控制：若是 admin，進入產品修改模式時顯示「複製到新產品」按鈕
                     const btnCopy = document.getElementById("btn-copy-product");
                     if (btnCopy) {
                         btnCopy.style.display = (currentRole === "admin") ? "block" : "none";
@@ -284,31 +282,31 @@
             itemNoInput.disabled = false;
             itemNoInput.className = "w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-cyan-500";
             
-            // 隱藏複製按鈕（建立模式下不需再顯示複製）
             const btnCopy = document.getElementById("btn-copy-product");
             if (btnCopy) btnCopy.style.display = "none";
             
             const btnSave = document.getElementById("btn-save");
             btnSave.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> 確認新增並發布雲端`;
             btnSave.className = "w-full sm:w-auto bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold px-8 py-3 rounded-xl transition-all shadow-lg shadow-cyan-950/40 flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-3";
+            
+            clearFormFields();
+            document.getElementById("edit-form-section").classList.remove("hidden");
         }
 
-        // 🎯 複製到新產品的按鈕點擊處理邏輯
         function handleCopyToNewProduct() {
             if (!confirm("確定要將此產品數據複製為新範本嗎？\n系統將切換至新增介面，並保留目前的規格數值供您修改。")) {
                 return;
             }
             
-            // 1. 先呼叫切換至新增模式（調整標題、CSS、狀態、隱藏複製按鈕）
+            const currentItemName = document.getElementById("form-item-name").value;
             switchToCreateMode();
             
-            // 2. 清空產品品號欄位（強制品號必須重新輸入，以防重複主鍵錯誤）
             const itemNoInput = document.getElementById("form-item-no");
             itemNoInput.value = "";
             itemNoInput.focus();
             
-            // 3. 在品名後方補上「- 複製」字樣，提醒使用者這是複製出來的
             const nameInput = document.getElementById("form-item-name");
+            nameInput.value = currentItemName;
             if (nameInput.value && !nameInput.value.includes("複製")) {
                 nameInput.value = nameInput.value + " - 複製";
             }
@@ -374,6 +372,8 @@
                 return;
             }
 
+            const nowIsoString = new Date().toISOString();
+
             const insertData = {
                 item_no: itemNo, 
                 item_name: itemName,
@@ -387,7 +387,10 @@
                 width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
-                updated_by: `${currentOperator}`
+                updated_by: `${currentOperator}`,
+                // 🎯 核心修改：建立新記錄時，同步附加 created_at 與 updated_at 時間戳記
+                created_at: nowIsoString,
+                updated_at: nowIsoString
             };
 
             if (!confirm(`確定要建立全新產品 [${itemNo} - ${itemName}] 嗎？`)) {
@@ -417,44 +420,47 @@
                     throw new Error(errText);
                 }
 
+                const serverData = await res.json();
+                if (!serverData || serverData.length === 0) {
+                    throw new Error("雖然連線成功，但雲端 RLS 安全原則拒絕了本次新增操作。");
+                }
+
                 alert(`🎉 新增成功！\n全新產品 [${itemNo}] 已成功寫入雲端主檔。`);
-                clearSearch();
+                
+                // 🎯 體驗優化：新增成功後不關閉表單，自動切為「編輯/鎖定」狀態，並保持即時可查閱狀態
+                resetFormToEditMode();
+                document.getElementById("search-keyword").value = `${itemNo} - ${itemName}`;
+                
+                const btnCopy = document.getElementById("btn-copy-product");
+                if (btnCopy) btnCopy.style.display = (currentRole === "admin") ? "block" : "none";
 
             } catch (err) {
                 alert(`建立失敗: ${err.message}`);
-            } finally {
+            } finaly {
                 btnSave.disabled = false;
-                resetFormToEditMode();
             }
         }
 
-    async function executeInsertProduct() {
-        const itemNo = document.getElementById("form-item-no").value.trim();
-        const itemName = document.getElementById("form-item-name").value.trim();
-        const btnSave = document.getElementById("btn-save");
+        async function saveProductChange() {
+            const itemNo = document.getElementById("form-item-no").value;
+            const btnSave = document.getElementById("btn-save");
 
-        if (!itemNo || !itemName) {
-            alert("❌ 產品品號與產品品名為必填欄位！");
-            return;
-        }
-
-        const insertData = {
-            item_no: itemNo, 
-            item_name: itemName,
-            spec: document.getElementById("form-spec").value.trim(),
-            pack_qty: document.getElementById("form-pack-qty").value ? parseInt(document.getElementById("form-pack-qty").value) : null,
-            pallets_box_qty: document.getElementById("form-pallets-box-qty").value ? parseInt(document.getElementById("form-pallets-box-qty").value) : null,
-            base_qty: document.getElementById("form-base-qty").value ? parseInt(document.getElementById("form-base-qty").value) : null,
-            cubic_per_box: document.getElementById("form-cubic").value ? parseFloat(document.getElementById("form-cubic").value) : null,
-            gross_weight: document.getElementById("form-gross-weight").value ? parseFloat(document.getElementById("form-gross-weight").value) : null,
-            length: document.getElementById("form-length").value ? parseFloat(document.getElementById("form-length").value) : null,
-            width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
-            height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
-            shelf_life: document.getElementById("form-shelf-life").value.trim(),
-            updated_by: `${currentOperator}`,
-            // 🎯 核心修改：全新建立時，同步帶入當前建立時間
-            updated_at: new Date().toISOString() 
-        };
+            const updateData = {
+                item_name: document.getElementById("form-item-name").value.trim(),
+                spec: document.getElementById("form-spec").value.trim(),
+                pack_qty: document.getElementById("form-pack-qty").value ? parseInt(document.getElementById("form-pack-qty").value) : null,
+                pallets_box_qty: document.getElementById("form-pallets-box-qty").value ? parseInt(document.getElementById("form-pallets-box-qty").value) : null,
+                base_qty: document.getElementById("form-base-qty").value ? parseInt(document.getElementById("form-base-qty").value) : null,
+                cubic_per_box: document.getElementById("form-cubic").value ? parseFloat(document.getElementById("form-cubic").value) : null,
+                gross_weight: document.getElementById("form-gross-weight").value ? parseFloat(document.getElementById("form-gross-weight").value) : null,
+                length: document.getElementById("form-length").value ? parseFloat(document.getElementById("form-length").value) : null,
+                width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
+                height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
+                shelf_life: document.getElementById("form-shelf-life").value.trim(),
+                updated_by: `${currentOperator}`,
+                // 🎯 核心修改：修改產品時，自動更新 updated_at 時間戳記 (created_at 則維持原樣不更動)
+                updated_at: new Date().toISOString()
+            };
 
             if (!updateData.item_name) {
                 alert("產品品名不能為空！");
@@ -475,7 +481,7 @@
                         "apikey": SUPABASE_KEY,
                         "Authorization": `Bearer ${SUPABASE_KEY}`,
                         "Content-Type": "application/json",
-                        "Prefer": "return=minimal"
+                        "Prefer": "return=representation" // 強迫要求伺服器回傳更新後的完整資料列，阻斷假成功
                     },
                     body: JSON.stringify(updateData)
                 });
@@ -485,23 +491,17 @@
                     throw new Error(errText);
                 }
 
-                try {
-                    await fetch(`${SUPABASE_URL}/rest/v1/products?item_no=eq.${encodeURIComponent(itemNo)}`, {
-                        method: "PATCH",
-                        headers: {
-                            "apikey": SUPABASE_KEY,
-                            "Authorization": `Bearer ${SUPABASE_KEY}`,
-                            "Content-Type": "application/json",
-                            "Prefer": "return=minimal"
-                        },
-                        body: JSON.stringify({ updated_by: `${currentOperator}` })
-                    });
-                } catch (e) {
-                    console.log("歷程記錄由底層自動扣接中");
+                const serverData = await res.json();
+                if (!serverData || serverData.length === 0) {
+                    throw new Error("雖然網路連線成功，但雲端 RLS 安全原則攔截並拒絕了本次變更！請檢查權限設定。");
                 }
 
+                const newestItemName = serverData[0].item_name;
+
                 alert(`🎉 儲存成功！\n品號 [${itemNo}] 的最新規格已成功同步至雲端系統。`);
-                clearSearch(); 
+                
+                // 🎯【體驗修復】：成功後不呼叫 clearSearch()，而是精確同步更新第一步的文字，讓搜尋功能不中斷
+                document.getElementById("search-keyword").value = `${itemNo} - ${newestItemName}`;
                 
             } catch (err) {
                 alert(`儲存失敗: 發生技術性錯誤\n${err.message}`);
