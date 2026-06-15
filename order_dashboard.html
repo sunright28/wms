@@ -3,68 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WMS 後台訂單管理中樞 (一列式棧板欄位修正版)</title>
+    <title>WMS 訂單管理控制台</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen">
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8">
 
-    <header class="bg-slate-800/80 backdrop-blur-md border-b border-slate-700/60 sticky top-0 z-50 px-6 py-4 flex justify-between items-center shadow-lg">
-        <div class="flex items-center gap-3">
-            <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-900/30">
-                <i class="fa-solid fa-sitemap text-lg"></i>
-            </div>
-            <div>
-                <h1 class="text-lg font-black tracking-wider text-white">WMS 兩層式訂單管理中樞</h1>
-                <p class="text-xs text-indigo-400 font-medium">第一層：訂單大底數據維護 | 第二層：棧板細項一列式匯整 (精準欄位對接)</p>
-            </div>
-        </div>
-        <a href="index.html" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs">
-            <i class="fa-solid fa-arrow-left-long"></i> 返回中控首頁
-        </a>
-    </header>
+    <script>
+        (function() {
+            // 1. 解析網址列傳遞的參數
+            const params = new URLSearchParams(window.location.search);
+            const urlUser = params.get("username");
+            const urlRole = params.get("role") ? params.get("role").trim().toLowerCase() : "";
 
-    <main class="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
+            // 2. 讀取本機登入憑證快取
+            const cachedData = localStorage.getItem("currentUser");
+            let cachedUser = null;
+            if (cachedData) {
+                try { cachedUser = JSON.parse(cachedData); } catch(e) {}
+            }
 
-        <div class="bg-slate-800/60 rounded-2xl border border-slate-700/50 p-4 shadow-xl grid grid-cols-1 md:grid-cols-3 gap-4 items-end text-sm">
-            <div>
-                <label class="block text-xs font-bold text-slate-400 mb-1.5">起算日期 (START)</label>
-                <div class="relative cursor-pointer" onclick="document.getElementById('date-start').showPicker()">
-                    <input type="date" id="date-start" onclick="event.stopPropagation(); this.showPicker();" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500 cursor-pointer">
-                    <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 pointer-events-none"><i class="fa-solid fa-calendar-days"></i></span>
+            // 3. 升級版資安交叉核對（修正離線測試工號與名稱不對稱導致的阻擋問題）
+            // 只要確認本機快取存在，且快取內的職等與網址上的職等確實皆為最高的 'admin' 即可放行
+            const isCachedAdmin = (cachedUser && cachedUser.role && cachedUser.role.trim().toLowerCase() === 'admin');
+            const isUrlAdmin = (urlRole === 'admin');
+
+            if (!isCachedAdmin || !isUrlAdmin) {
+                alert("❌ 安全攔截：偵測到非法直接存取！\n進入管理員訂單控制台需具備【系統管理員 (Admin)】身分，請由系統首頁正常登入。");
+                window.location.replace("index.html"); // 強制踢回首頁，且不留瀏覽器歷史紀錄
+            }
+        })();
+    </script>
+
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent_45%)] pointer-events-none"></div>
+
+    <div class="max-w-7xl mx-auto space-y-6 relative z-10">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-800/60 p-4 rounded-2xl border border-slate-700/50 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-500/20 text-indigo-400 p-3 rounded-xl border border-indigo-500/30">
+                    <i class="fa-solid fa-folder-tree text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-wider text-slate-100">WMS 訂單管理控制台</h1>
+                    <p class="text-xs text-slate-400">目前登入：<span id="user-display" class="text-indigo-400 font-mono font-bold">驗證中...</span></p>
                 </div>
             </div>
-            <div>
-                <label class="block text-xs font-bold text-slate-400 mb-1.5">結束日期 (END)</label>
-                <div class="relative cursor-pointer" onclick="document.getElementById('date-end').showPicker()">
-                    <input type="date" id="date-end" onclick="event.stopPropagation(); this.showPicker();" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500 cursor-pointer">
-                    <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 pointer-events-none"><i class="fa-solid fa-calendar-days"></i></span>
+            <button onclick="window.location.replace('index.html')" class="text-xs bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-xl text-slate-300 hover:text-white font-medium transition-all cursor-pointer flex items-center">
+                <i class="fa-solid fa-arrow-left mr-1"></i> 回主選單
+            </button>
+        </div>
+
+        <!-- 日期篩選控制列（新増以對接下方 initDates 及 fetchOrdersByGroup 的操作元件） -->
+        <div class="bg-slate-800/40 p-4 rounded-2xl border border-slate-700/40 flex flex-wrap items-center gap-4 text-sm">
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-bold text-slate-400">開始日期:</label>
+                <input type="date" id="date-start" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500 text-xs">
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-bold text-slate-400">結束日期:</label>
+                <input type="date" id="date-end" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500 text-xs">
+            </div>
+            <button onclick="fetchOrdersByGroup()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-1.5 rounded-xl text-xs transition-all cursor-pointer">
+                <i class="fa-solid fa-magnifying-glass mr-1"></i> 查詢排程
+            </button>
+            <div id="loader-status" class="hidden text-xs text-indigo-400 font-medium items-center gap-1">
+                <i class="fa-solid fa-spinner animate-spin"></i> 資料同步中...
+            </div>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700/60 shadow-xl space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-sm font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-list-check text-indigo-400"></i> 系統即時訂單排程清單
+                </h2>
+                <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-md font-medium">連線安全防護已啟動</span>
+            </div>
+
+            <!-- 動態渲染訂單排程主容器 -->
+            <div id="dashboard-content" class="space-y-4">
+                <div class="border border-dashed border-slate-700 rounded-xl p-8 text-center text-sm text-slate-500">
+                    <i class="fa-solid fa-database mb-2 text-xl block text-slate-600"></i>
+                    正在初始化系統排程數據表...
                 </div>
             </div>
-            <div class="flex gap-2">
-                <button onclick="fetchOrdersByGroup()" class="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-950/40 transition-all flex items-center justify-center gap-2 cursor-pointer">
-                    <i class="fa-solid fa-magnifying-glass"></i> 查詢訂單
-                </button>
-                <button onclick="initDates(true)" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 h-11 rounded-xl transition-all cursor-pointer"><i class="fa-solid fa-arrow-rotate-left"></i></button>
-            </div>
         </div>
 
-        <div id="loader-status" class="hidden text-center py-16 space-y-3 bg-slate-800/20 rounded-2xl border border-dashed border-slate-700/60">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-3 border-indigo-500 border-t-transparent"></div>
-            <p class="text-xs text-slate-400 tracking-wider">正在利用資料庫外鍵串接技術，精準撈取訂單與一列式棧板報表...</p>
-        </div>
-
-        <div id="dashboard-content" class="space-y-4"></div>
-
-    </main>
+        <p class="text-center text-[11px] text-slate-600 font-mono">Secure Enterprise Routing Network | © 2026 WMS Control.</p>
+    </div>
 
     <script>
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
 
-        document.addEventListener("DOMContentLoaded", () => { 
-            initDates(false); 
-            fetchOrdersByGroup(); 
+        // 讀取傳遞過來的安全參數以供畫面上權限 Badge 的動態顯示
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentOperator = urlParams.get("username") || "進階管理員";
+        const currentRole = (urlParams.get("role") || "user").trim().toLowerCase();
+
+        document.addEventListener("DOMContentLoaded", () => {
+            // 利用您要求的精確三元運算子語法結構，來動態渲染看板上的操作者稱謂
+            document.getElementById("user-display").innerText = 
+                (currentRole === 'admin') ? `${currentOperator} (系統管理員)` : currentOperator;
+            
+            // 網頁開啟時，自動初始化時間區間並自動載入資料庫訂單
+            initDates(true);
         });
 
         function initDates(forceRefetch) {
@@ -168,7 +210,7 @@
                             </div>
                         </div>
 
-                        <div id="${palletPanelId}" class="hidden pl-4 pr-1 py-1 border-l-2 border-indigo-500/30 space-y-3 animate-fade-in">
+                        <div id="${palletPanelId}" class="hidden pl-4 pr-1 py-1 border-l-2 border-indigo-500/30 space-y-3">
                         </div>
                     `;
                     content.appendChild(orderCard);
@@ -194,16 +236,13 @@
                         const cubicVal = parseFloat(pallet.total_cubic) || 0;
                         const piecesVal = parseInt(pallet.total_pieces) || 0;
                         
-                        // 💡 將小數點 (例 0.46) 乘上 100 轉為整數百分比 (例 46%)
                         let ratioStr = "0%";
                         if (pallet.space_ratio !== null && pallet.space_ratio !== undefined) {
                             const parsedRatio = parseFloat(pallet.space_ratio);
                             if (!isNaN(parsedRatio)) {
-                                // 防呆：如果資料庫抓出來的已經是帶有 % 的字串，就直接沿用；如果是純小數，則乘以 100 並四捨五入
                                 ratioStr = String(pallet.space_ratio).includes('%') ? pallet.space_ratio : `${Math.round(parsedRatio * 100)}%`;
                             }
                         }
-                        // 計算總工時，如無數據自動顯示 00:00:00
                         const totalDuration = calculateDuration(pallet.start_time, pallet.end_time);
 
                         const palletCard = document.createElement("div");
@@ -356,7 +395,7 @@
             } catch (err) { alert(`退回失敗：${err.message}`); }
         }
 
-        // ⏱️ 格式化時間區塊（如無數據預設秀出 00:00:00）
+        // ⏱️ 格式化時間區塊
         function formatTime(isoString) {
             if(!isoString) return `00:00:00`;
             try { 
@@ -365,7 +404,7 @@
             } catch(e) { return `00:00:00`; }
         }
 
-        // 🧮 自動計算總工時函數（如無數據預設秀出 00:00:00）
+        // 🧮 自動計算總工時函數
         function calculateDuration(startIso, endIso) {
             if (!startIso || !endIso) return "00:00:00";
             try {

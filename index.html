@@ -99,25 +99,25 @@
             </div>
             
             <div class="grid grid-cols-2 gap-4">
-                <a href="order_dashboard.html" class="bg-slate-800 hover:bg-slate-750 p-6 rounded-2xl border border-indigo-500/30 hover:border-indigo-500 text-center space-y-3 shadow-md hover:shadow-indigo-900/20 transition-all group block">
+                <button onclick="goToOrderDashboard()" class="bg-slate-800 hover:bg-slate-750 p-6 rounded-2xl border border-indigo-500/30 hover:border-indigo-500 text-center space-y-3 shadow-md hover:shadow-indigo-900/20 transition-all group block w-full cursor-pointer text-left">
                     <div class="text-indigo-400 text-3xl group-hover:scale-110 transition-transform mx-auto w-fit">
                         <i class="fa-solid fa-folder-tree"></i>
                     </div>
-                    <div>
+                    <div class="text-center">
                         <h3 class="text-sm font-black text-slate-200">1. 訂單管理</h3>
                         <p class="text-[10px] text-slate-500 mt-1 font-mono">order_dashboard.html</p>
                     </div>
-                </a>
+                </button>
 
-                <a href="users_management.html" class="bg-slate-800 hover:bg-slate-750 p-6 rounded-2xl border border-slate-700 hover:border-emerald-500 text-center space-y-3 shadow-md hover:shadow-emerald-900/20 transition-all group block">
-                    <div class="text-emerald-400 text-3xl group-hover:scale-110 transition-transform mx-auto w-fit">
-                        <i class="fa-solid fa-users-gear"></i>
+                <button onclick="goTousermanagement()" class="bg-slate-800 hover:bg-slate-750 p-6 rounded-2xl border border-indigo-500/30 hover:border-indigo-500 text-center space-y-3 shadow-md hover:shadow-indigo-900/20 transition-all group block w-full cursor-pointer text-left">
+                    <div class="text-indigo-400 text-3xl group-hover:scale-110 transition-transform mx-auto w-fit">
+                        <i class="fa-solid fa-folder-tree"></i>
                     </div>
-                    <div>
+                    <div class="text-center">
                         <h3 class="text-sm font-black text-slate-200">2. 人員管理</h3>
-                        <p class="text-[10px] text-slate-500 mt-1">網頁待編寫</p>
+                        <p class="text-[10px] text-slate-500 mt-1 font-mono">users_management.html</p>
                     </div>
-                </a>
+                </button>
             </div>
         </div>
 
@@ -154,7 +154,7 @@
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
 
-        let currentAuthMode = ''; // admin, products, password, download
+        let currentAuthMode = ''; 
 
         function openAuthModal(mode) {
             currentAuthMode = mode;
@@ -203,7 +203,6 @@
             if (userPass === "admin123") {
                 const isTestAdmin = (userId === "120404" || userId === "1" || userId.toLowerCase().includes("admin"));
                 
-                // 🛠️【修復關鍵】：離線測試成功時，同樣將使用者資訊寫入快取，供子網頁做交叉安全驗證
                 const offlineUser = {
                     username: userId,
                     display_name: userId === "1" ? "測試管理員" : "離線人員",
@@ -236,7 +235,6 @@
                         role: userRole 
                     };
 
-                    // 🛠️【修復關鍵】：將完全核對正確的資料庫使用者身分寫入瀏覽器本機快取
                     localStorage.setItem("currentUser", JSON.stringify(sessionUser));
                     
                     executeLoginSuccess(sessionUser);
@@ -252,7 +250,6 @@
             }
         }
 
-        // 🎯 核心分流控制中樞
         function executeLoginSuccess(userObject) {
             closeAuthModal();
             
@@ -283,6 +280,41 @@
         function backToMainMenu() {
             document.getElementById("admin-menu-section").classList.add("hidden");
             document.getElementById("main-menu").classList.remove("hidden");
+        }
+
+        // 🚀 🎯 專屬功能：直接安全跳轉至訂單管理控制台
+        function goToOrderDashboard() {
+            const cachedData = localStorage.getItem("currentUser");
+            if (!cachedData) {
+                alert("❌ 憑證失效或尚未登入，請重新進行安全驗證！");
+                window.location.reload();
+                return;
+            }
+            
+            const user = JSON.parse(cachedData);
+            if (user.role === 'admin') {
+                // 🛠️ 核心修正：將跳轉目標精確導向您的實際檔案 order_dashboard.html (修正拼字錯誤並自動帶上安全憑證)
+                window.location.href = `order_dashboard.html?username=${encodeURIComponent(user.display_name)}&role=${encodeURIComponent(user.role)}`;
+            } else {
+                alert("❌ 權限不足：進入訂單控制台需具備【系統管理員 (Admin)】身分！");
+            }
+        }
+            // 🚀 🎯 專屬功能：直接安全跳轉至訂單管理控制台
+        function goTousermanagement() {
+            const cachedData = localStorage.getItem("currentUser");
+            if (!cachedData) {
+                alert("❌ 憑證失效或尚未登入，請重新進行安全驗證！");
+                window.location.reload();
+                return;
+            }
+            
+            const user = JSON.parse(cachedData);
+            if (user.role === 'admin') {
+                // 🛠️ 核心修正：將跳轉目標精確導向您的實際檔案 order_dashboard.html (修正拼字錯誤並自動帶上安全憑證)
+                window.location.href = `users_management.html?username=${encodeURIComponent(user.display_name)}&role=${encodeURIComponent(user.role)}`;
+            } else {
+                alert("❌ 權限不足：進入訂單控制台需具備【系統管理員 (Admin)】身分！");
+            }
         }
     </script>
 </body>
