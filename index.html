@@ -174,7 +174,6 @@
                 title.innerText = "產品主檔維護驗證";
                 desc.innerText = "變更產品主檔規格需具備管理員或主管身分";
             } else if (mode === 'download') {
-                // 🎯 檔案下載的彈窗外觀定義
                 icon.innerHTML = `<span class="text-cyan-400"><i class="fa-solid fa-cloud-arrow-down"></i></span>`;
                 title.innerText = "檔案下載安全驗證";
                 desc.innerText = "讀取機密文件需具備管理員或主管身分";
@@ -203,11 +202,16 @@
 
             if (userPass === "admin123") {
                 const isTestAdmin = (userId === "120404" || userId === "1" || userId.toLowerCase().includes("admin"));
-                executeLoginSuccess({
+                
+                // 🛠️【修復關鍵】：離線測試成功時，同樣將使用者資訊寫入快取，供子網頁做交叉安全驗證
+                const offlineUser = {
                     username: userId,
                     display_name: userId === "1" ? "測試管理員" : "離線人員",
                     role: isTestAdmin ? "admin" : "user"
-                });
+                };
+                localStorage.setItem("currentUser", JSON.stringify(offlineUser));
+                
+                executeLoginSuccess(offlineUser);
                 return;
             }
 
@@ -226,13 +230,16 @@
                     const matchedUser = users[0];
                     let userRole = matchedUser.role ? matchedUser.role.trim().toLowerCase() : "user";
                     
-                    localStorage.setItem("currentUser", JSON.stringify(matchedUser));
-                    
-                    executeLoginSuccess({ 
+                    const sessionUser = { 
                         username: matchedUser.username, 
                         display_name: matchedUser.display_name || matchedUser.username, 
                         role: userRole 
-                    });
+                    };
+
+                    // 🛠️【修復關鍵】：將完全核對正確的資料庫使用者身分寫入瀏覽器本機快取
+                    localStorage.setItem("currentUser", JSON.stringify(sessionUser));
+                    
+                    executeLoginSuccess(sessionUser);
                 } else {
                     alert("❌ 工號或密碼錯誤，請重新確認！");
                 }
@@ -263,9 +270,7 @@
                     alert("❌ 權限不足：變更產品主檔欄位需具備【管理員】或【主管】身分！");
                 }
             } else if (currentAuthMode === 'download') {
-                // 🎯【新增分流】：限制僅 admin 及 supervisor 可以成功進入檔案下載專區
                 if (userObject.role === 'admin' || userObject.role === 'supervisor') {
-                    // 請在這裡換成您實際要導向的下載區檔名（例如: file_download.html）
                     window.location.href = `file_download.html?username=${encodeURIComponent(userObject.display_name)}&role=${encodeURIComponent(userObject.role)}`;
                 } else {
                     alert("❌ 權限不足：讀取或下載系統核心營運文件需具備【管理員】或【主管】身分！");

@@ -6,6 +6,66 @@
     <title>WMS 產品主檔維護系統</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        // 🔒【終極安全性檢查鎖】：防直接開啟、防手動竄改網址參數
+        let currentOperator = "未明管理員";
+        let currentRole = "";
+
+        (function() {
+            // 1. 取得網址列上的參數
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlUser = urlParams.get("username");
+            const urlRole = (urlParams.get("role") || "").trim().toLowerCase();
+
+            // 2. 取得瀏覽器快取 (localStorage)
+            const cachedUser = localStorage.getItem("currentUser");
+
+            // 🛑 漏洞攔截點 A：如果是直接輸入網址進來（網址沒有帶帳號或權限參數），直接踢掉
+            if (!urlUser || !urlRole) {
+                alert("❌ 安全攔截：偵測到非法直接存取！請由系統首頁正常登入進入。");
+                localStorage.removeItem("currentUser"); // 順便洗掉殘留快取
+                window.location.replace("index.html");
+                return;
+            }
+
+            // 🛑 漏洞攔截點 B：如果連快取都沒有，代表根本沒登入過
+            if (!cachedUser) {
+                alert("❌ 安全攔截：您尚未登入系統，請先進行身分驗證！");
+                window.location.replace("index.html");
+                return;
+            }
+
+            try {
+                const userObj = JSON.parse(cachedUser);
+                const cacheUser = userObj.display_name;
+                const cacheRole = (userObj.role || "").trim().toLowerCase();
+
+                // 🛑 漏洞攔截點 C（防作弊關鍵）：比對「網址帶的權限」和「資料庫查出來的快取權限」是否吻合！
+                // 如果有人手動把網址改成 ?role=admin，但快取內其實是工讀生，這裡就會抓包！
+                if (urlUser !== cacheUser || urlRole !== cacheRole) {
+                    alert("❌ 安全警告：偵測到網址參數遭蓄意竄改，系統已鎖定存取！");
+                    localStorage.removeItem("currentUser");
+                    window.location.replace("index.html");
+                    return;
+                }
+
+                // 3. 驗證通過，正式放行並指派變數
+                currentOperator = cacheUser;
+                currentRole = cacheRole;
+
+                // 🛑 漏洞攔截點 D：確認其身分是否符合管理階層
+                if (currentRole !== "admin" && currentRole !== "supervisor") {
+                    alert("❌ 權限不足：您不具備【管理員】或【主管】身分，拒絕存取此維護系統！");
+                    window.location.replace("index.html");
+                }
+
+            } catch(e) {
+                alert("❌ 系統安全性錯誤，請重新登入！");
+                localStorage.removeItem("currentUser");
+                window.location.replace("index.html");
+            }
+        })();
+    </script>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8">
 
@@ -20,7 +80,7 @@
                 </div>
                 <div>
                     <h1 class="text-lg font-black tracking-wider text-slate-100">產品主檔維護</h1>
-                    <p class="text-xs text-slate-400">使用者：<span id="operator-display" class="text-emerald-400 font-mono font-bold">讀取中...</span></p>
+                    <p class="text-xs text-slate-400">使用者：<span id="operator-display" class="text-emerald-400 font-mono font-bold">驗證中...</span></p>
                 </div>
             </div>
             <a href="index.html" class="text-xs bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-xl text-slate-300 hover:text-white font-medium transition-all cursor-pointer">
@@ -140,29 +200,16 @@
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentOperator = urlParams.get("username") || "未明管理員";
-        
-        let currentRole = "";
-        try {
-            const cachedUser = localStorage.getItem("currentUser");
-            if (cachedUser) {
-                const userObj = JSON.parse(cachedUser);
-                currentRole = userObj.role || "";
-            }
-        } catch(e) { console.error("解析快取使用者失敗", e); }
-        if (!currentRole) {
-            currentRole = (urlParams.get("role") || "").trim().toLowerCase();
-        }
-
         let debounceTimer; 
         let isCreateMode = false; 
 
         document.addEventListener("DOMContentLoaded", () => {
+            // 將經上方驗證通過的正確操作者姓名放到畫面上
             document.getElementById("operator-display").innerText = currentOperator;
             
             const btnShowAdd = document.getElementById("btn-show-add-mode");
             if (btnShowAdd) {
+                // 只允許管理員顯示新增按鈕
                 if (currentRole === "admin") {
                     btnShowAdd.style.display = "block";
                 } else {
@@ -362,6 +409,12 @@
         }
 
         async function executeInsertProduct() {
+            // 安全防線：再次確保只有 admin 可以新增
+            if (currentRole !== "admin") {
+                alert("❌ 權限不足：您的帳號權限無法執行新增產品操作！");
+                return;
+            }
+
             const itemNo = document.getElementById("form-item-no").value.trim();
             const itemName = document.getElementById("form-item-name").value.trim();
             const btnSave = document.getElementById("btn-save");
@@ -371,7 +424,6 @@
                 return;
             }
 
-            // ✨ 先前可行的乾淨架構，僅在 insertData 內安全地加上 created_at
             const insertData = {
                 item_no: itemNo, 
                 item_name: itemName,
@@ -386,7 +438,7 @@
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
                 updated_by: `${currentOperator}`,
-                created_at: new Date().toISOString() // 🎯 依要求加上：新增時建立時間
+                created_at: new Date().toISOString()
             };
 
             if (!confirm(`確定要建立全新產品 [${itemNo} - ${itemName}] 嗎？`)) {
@@ -431,7 +483,8 @@
             const itemNo = document.getElementById("form-item-no").value;
             const btnSave = document.getElementById("btn-save");
 
-            // ✨ 回復先前完全可行的基本更新包架構，並僅安全地在內層加上 updated_at
+            const todayDateString = new Date().toISOString().split('T')[0];
+
             const updateData = {
                 item_name: document.getElementById("form-item-name").value.trim(),
                 spec: document.getElementById("form-spec").value.trim(),
@@ -445,7 +498,7 @@
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
                 updated_by: `${currentOperator}`,
-                updated_at: new Date().toISOString() // 🎯 依要求加上：修改時更新時間
+                updated_at: todayDateString
             };
 
             if (!updateData.item_name) {
@@ -461,7 +514,6 @@
             btnSave.innerHTML = `<i class="fa-solid fa-spinner animate-spin mr-2"></i> 正在上傳至雲端...`;
 
             try {
-                // 回復最原本可行的單次呼叫，不再混入會導致 RLS 衝突的欄位
                 const res = await fetch(`${SUPABASE_URL}/rest/v1/products?item_no=eq.${encodeURIComponent(itemNo)}`, {
                     method: "PATCH",
                     headers: {
@@ -478,7 +530,7 @@
                     throw new Error(errText);
                 }
 
-                alert(`🎉 儲存成功！\n品號 [${itemNo}] 的最新規格已成功同步至雲端系統。`);
+                alert(`🎉 儲存成功！\n品號 [${itemNo}] 的最新規格與修改時間已成功同步。`);
                 clearSearch(); 
                 
             } catch (err) {

@@ -10,6 +10,30 @@
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8 flex items-center justify-center">
 
+    <script>
+        (function() {
+            // 1. 解析網址列參數
+            const params = new URLSearchParams(window.location.search);
+            const urlUser = params.get("username");
+            const urlRole = params.get("role") ? params.get("role").trim().toLowerCase() : "";
+
+            // 2. 讀取本機登入快取憑證
+            const cachedData = localStorage.getItem("currentUser");
+            let cachedUser = null;
+            if (cachedData) {
+                try { cachedUser = JSON.parse(cachedData); } catch(e) {}
+            }
+
+            // 3. 執行嚴格的身分交叉安全驗證 (必須有網址參數、有快取，且職等必須是 admin 或 supervisor)
+            const isValidRole = (urlRole === 'admin' || urlRole === 'supervisor');
+            
+            if (!urlUser || !urlRole || !isValidRole || !cachedUser || cachedUser.role.trim().toLowerCase() !== urlRole) {
+                alert("❌ 安全攔截：偵測到非法直接存取！\n讀取或下載系統核心營運文件，請由系統首頁進行正常安全驗證登入。");
+                window.location.replace("index.html"); // 強制踢回首頁且無法按上一頁返回
+            }
+        })();
+    </script>
+
     <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.15),transparent_45%)] pointer-events-none"></div>
 
     <div class="max-w-xl w-full space-y-6 relative z-10">
@@ -24,9 +48,9 @@
                     <p class="text-xs text-slate-400">登入權限：<span id="user-display" class="text-cyan-400 font-mono font-bold">驗證中...</span></p>
                 </div>
             </div>
-            <a href="index.html" class="text-xs bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-xl text-slate-300 hover:text-white font-medium transition-all cursor-pointer">
+            <button onclick="window.location.replace('index.html')" class="text-xs bg-slate-700/50 hover:bg-slate-700 px-3 py-2 rounded-xl text-slate-300 hover:text-white font-medium transition-all cursor-pointer flex items-center">
                 <i class="fa-solid fa-arrow-left mr-1"></i> 回主選單
-            </a>
+            </button>
         </div>
 
         <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700/60 shadow-xl space-y-4">
@@ -68,7 +92,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <h3 class="text-sm font-bold text-slate-200 group-hover:text-cyan-400 transition-colors truncate">3. 產品主檔即時下載</h3>
-                        <p id="export-status" class="text-[11px] text-slate-400 font-mono mt-0.5 truncate">從 Supabase 雲端即時串接轉換成 Excel 中文檔</p>
+                        <p id="export-status" class="text-[11px] text-slate-400 font-mono mt-0.5 truncate">從雲端即時串接轉換成 Excel 中文檔</p>
                     </div>
                     <div class="text-cyan-500 px-2 text-xs font-semibold flex items-center gap-1">
                         <span>匯出</span> <i class="fa-solid fa-file-export"></i>
@@ -87,7 +111,7 @@
 
         // 初始化讀取網址列傳遞過來的操作人員與身分
         const urlParams = new URLSearchParams(window.location.search);
-        const currentOperator = urlParams.get("username") || "進階同仁";
+        const currentOperator = urlParams.get("username") || "未授權同仁";
         const currentRole = (urlParams.get("role") || "user").trim().toLowerCase();
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -159,15 +183,18 @@
                 const workbook = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(workbook, worksheet, "Products_List");
 
-                // 6. 📅 計算今日日期 (格式為 YYYYMMDD)
+                // 6. 📅 計算今日日期與時間 (格式為 YYYYMMDD_hhmmss)
                 const today = new Date();
                 const yyyy = today.getFullYear();
                 const mm = String(today.getMonth() + 1).padStart(2, '0');
                 const dd = String(today.getDate()).padStart(2, '0');
-                const formattedDate = `${yyyy}${mm}${dd}`;
 
-                // 組合您要求的規格檔名：產品主檔案+日期.xlsx (例如: 產品主檔案_20260614.xlsx)
-                const finalFileName = `產品主檔案_${formattedDate}.xlsx`;
+                const hh = String(today.getHours()).padStart(2, '0');
+                const min = String(today.getMinutes()).padStart(2, '0');
+                const ss = String(today.getSeconds()).padStart(2, '0');
+
+                const formattedDateTime = `${yyyy}${mm}${dd}_${hh}${min}${ss}`;
+                const finalFileName = `產品主檔案_${formattedDateTime}.xlsx`;
 
                 // 7. 觸發瀏覽器下載
                 XLSX.writeFile(workbook, finalFileName);
