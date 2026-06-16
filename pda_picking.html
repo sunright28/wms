@@ -4,9 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>WMS行動撿貨系統_C)</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4">
+document.addEventListener("DOMContentLoaded",()=>{
+ currentPickerTableId=1;
+ currentPickerId="PDA";
+ currentPickerName="PDA";
+ document.getElementById("page-orders").classList.remove("hidden");
+ loadOrders();
+});
+</script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://unpkg.com/html5-qrcode">
+document.addEventListener("DOMContentLoaded",()=>{
+ currentPickerTableId=1;
+ currentPickerId="PDA";
+ currentPickerName="PDA";
+ document.getElementById("page-orders").classList.remove("hidden");
+ loadOrders();
+});
+</script>
     <style>
         @keyframes pulse-red {
             0%, 100% { border-color: #ef4444; background-color: #fef2f2; }
@@ -35,7 +51,7 @@
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans antialiased select-none">
 
-    <header id="app-header" class="hidden bg-blue-700 text-white shadow-md sticky top-0 z-50 px-4 py-3 flex justify-between items-center">
+    <header id="app-header" class=" bg-blue-700 text-white shadow-md sticky top-0 z-50 px-4 py-3 flex justify-between items-center">
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-barcode-read text-xl"></i>
             <h1 class="text-lg font-bold tracking-wider">PDA 安全撿貨</h1>
@@ -47,35 +63,6 @@
     </header>
 
     <main class="p-3 max-w-md mx-auto">
-
-        <div id="page-login" class="bg-white rounded-2xl shadow-lg p-6 mt-6 space-y-5 border border-gray-200">
-            <div class="text-center space-y-1">
-                <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto text-2xl">
-                    <i class="fa-solid fa-shield-halved"></i>
-                </div>
-                <h2 class="text-xl font-bold">WMS 安全驗證登入</h2>
-                <p class="text-xs text-gray-400">請輸入或掃描人員工號與密碼</p>
-            </div>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">作業員工號 (Username)</label>
-                    <input type="text" id="login-user" class="w-full text-center text-base font-mono tracking-wider border-2 border-gray-200 rounded-xl p-2.5 focus:border-blue-500 focus:outline-none" placeholder="輸入工號 (如: OP001)">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">驗證密碼 (Password)</label>
-                    <input type="password" id="login-pass" class="w-full text-center text-base font-mono tracking-wider border-2 border-gray-200 rounded-xl p-2.5 focus:border-blue-500 focus:outline-none" placeholder="輸入安全密碼">
-                </div>
-                
-                <div id="login-err-msg" class="hidden text-center bg-red-50 border border-red-200 text-red-600 font-bold text-xs p-2.5 rounded-xl">
-                    <i class="fa-solid fa-triangle-exclamation mr-1"></i> <span id="login-err-text">工號或密碼錯誤，請重新輸入！</span>
-                </div>
-
-                <button onclick="loginVerify()" id="btn-login-submit" class="w-full bg-blue-600 active:bg-blue-800 text-white font-bold py-3.5 rounded-xl text-base shadow-md transition-all flex items-center justify-center gap-2">
-                    <span>驗證登入</span> <i class="fa-solid fa-key text-sm"></i>
-                </button>
-            </div>
-        </div>
 
         <div id="page-orders" class="hidden space-y-4">
             <div class="flex justify-between items-center">
@@ -202,102 +189,45 @@
     <script>
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
+        let currentPickerTableId = null;
+        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
 
-        let currentPickerTableId = null; 
-        let currentPickerId = "";        
-        let currentPickerName = "";      
-        
+        let currentPickerId = currentUser.username || "";
+        let currentPickerName = currentUser.display_name || "";
         let activePalletObject = null;   
         let currentPalletItems = [];
         let currentPalletId = null;
 
         let html5QrScanner = null;
         let isProcessingScan = false; // 防重覆觸發鎖
-
-        // 🔐 登入驗證
-        async function loginVerify() {
-            const userField = document.getElementById("login-user");
-            const passField = document.getElementById("login-pass");
-            const errMsg = document.getElementById("login-err-msg");
-            const errText = document.getElementById("login-err-text");
-            const btnSubmit = document.getElementById("btn-login-submit");
-
-            const username = userField.value.trim();
-            const password = passField.value.trim();
-
-            if (!username || !password) {
-                alert("工號與密碼皆不能留空！");
-                return;
-            }
-
-            errMsg.classList.add("hidden");
-            btnSubmit.disabled = true;
-            btnSubmit.innerHTML = `<div class="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div> <span>驗證中...</span>`;
-
-            try {
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(username)}&select=*`, {
-                    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
-                });
-
-                if (!response.ok) {
-                    const dbErr = await response.text();
-                    throw new Error(`DB_ERR: ${dbErr}`);
-                }
+        function Logout() {
+            if (confirm("確定要登出系統並切換作業帳號嗎？")) {
+                stopCameraScanner(); 
                 
-                const usersFound = await response.json();
-
-                if (usersFound.length > 0 && String(usersFound[0].password) === String(password)) {
-                    const userRawData = usersFound[0];
-                    
-                    currentPickerTableId = parseInt(userRawData.id) || null; 
-                    currentPickerId = username; 
-                    currentPickerName = userRawData.display_name || userRawData.name || username;
-                    
-                    document.getElementById("user-badge").innerText = `👤 ${currentPickerName}`;
-                    document.getElementById("page-login").classList.add("hidden");
-                    document.getElementById("app-header").classList.remove("hidden");
-                    document.getElementById("page-orders").classList.remove("hidden");
-                    
-                    playBeep(880, 0.08);
-                    setTimeout(() => playBeep(1200, 0.15), 80);
-
-                    passField.value = "";
-                    loadOrders(); 
-                } else {
-                    throw new Error("AUTH_FAILED");
-                }
-
-            } catch (err) {
-                errMsg.classList.remove("hidden");
-                if (err.message.startsWith("DB_ERR:")) {
-                    errText.innerText = `資料庫錯誤: ${err.message.replace("DB_ERR:", "")}`;
-                } else {
-                    errText.innerText = "工號或密碼錯誤，請重新輸入！";
-                }
-                passField.value = "";
-                passField.focus();
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.innerHTML = `<span>驗證登入</span> <i class="fa-solid fa-key text-sm"></i>`;
+                // 1. 務必清除 LocalStorage 快取，防止網頁重啟後自動登入
+                localStorage.removeItem("currentUser");
+                
+                // 2. 還原全域變數
+                currentPickerTableId = null;
+                currentPickerId = "";
+                currentPickerName = "";
+                
+                // 3. 最安全乾淨的登出方式：直接重新整理網頁
+                // 網頁重新載入後會自動走 DOMContentLoaded 流程，因為快取已被刪除，會乖乖停在登入頁面
+                window.location.reload();
             }
         }
+        document.addEventListener("DOMContentLoaded", () => {
 
-        document.getElementById("login-pass").addEventListener("keyup", (e) => {
-            if (e.key === "Enter") loginVerify();
+            document.getElementById("app-header").classList.remove("hidden");
+            document.getElementById("page-orders").classList.remove("hidden");
+
+            document.getElementById("user-badge").innerText =
+                `👤 ${currentPickerName} (${currentPickerId})`;
+
+            loadOrders();
         });
-
-        function logout() {
-            stopCameraScanner(); 
-            currentPickerTableId = null;
-            currentPickerId = "";
-            currentPickerName = "";
-            document.getElementById("page-login").classList.remove("hidden");
-            document.getElementById("app-header").classList.add("hidden");
-            document.getElementById("page-orders").classList.add("hidden");
-            document.getElementById("page-picking").classList.add("hidden");
-            document.getElementById("login-user").focus();
-        }
-// 📅 初始化日期控制項（如果沒選，預設為今日 YYYY-MM-DD）
+                // 📅 初始化日期控制項（如果沒選，預設為今日 YYYY-MM-DD）
         function initFilterDate() {
             const dateInput = document.getElementById("filter-date");
             if (dateInput && !dateInput.value) {
@@ -398,6 +328,8 @@
                 if (loader) loader.classList.add("hidden");
                 if (icon) icon.classList.remove("animate-spin");
             }
+              //playBeep(880, 0.08);
+                   setTimeout(() => playBeep(1200, 0.15), 80);
         }
 
 // 📂 動態抓取該單據下的所有棧板（支援本人續接，非本人鎖定機制）
@@ -978,6 +910,14 @@
                 osc.stop(ctx.currentTime + duration);
             } catch (err) { }
         }
-    </script>
+    
+document.addEventListener("DOMContentLoaded",()=>{
+ currentPickerTableId=1;
+ currentPickerId="PDA";
+ currentPickerName="PDA";
+ document.getElementById("page-orders").classList.remove("hidden");
+ loadOrders();
+});
+</script>
 </body>
 </html>

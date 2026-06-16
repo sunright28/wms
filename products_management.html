@@ -325,6 +325,7 @@
             
             document.getElementById("label-item-no").innerHTML = `產品品號 <span class="text-rose-400">*必填且不得重複</span>`;
             const itemNoInput = document.getElementById("form-item-no");
+            //const specInput=document.getElementById("form-spec");
             itemNoInput.disabled = false;
             itemNoInput.className = "w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-cyan-500";
             
@@ -338,26 +339,50 @@
             clearFormFields();
             document.getElementById("edit-form-section").classList.remove("hidden");
         }
-
-        function handleCopyToNewProduct() {
+function handleCopyToNewProduct() {
             if (!confirm("確定要將此產品數據複製為新範本嗎？\n系統將切換至新增介面，並保留目前的規格數值供您修改。")) {
                 return;
             }
             
+            // 1. 先把目前畫面上原本查出來的舊規格數值暫存起來
             const currentItemName = document.getElementById("form-item-name").value;
+            const currentSpec = document.getElementById("form-spec").value;
+            const currentPackQty = document.getElementById("form-pack-qty").value;
+            const currentPalletsBoxQty = document.getElementById("form-pallets-box-qty").value;
+            const currentBaseQty = document.getElementById("form-base-qty").value;
+            const currentCubic = document.getElementById("form-cubic").value;
+            const currentGrossWeight = document.getElementById("form-gross-weight").value;
+            const currentLength = document.getElementById("form-length").value;
+            const currentWidth = document.getElementById("form-width").value;
+            const currentHeight = document.getElementById("form-height").value;
+            const currentShelfLife = document.getElementById("form-shelf-life").value;
+
+            // 2. 切換到新增模式（這會把畫面變成新增狀態）
             switchToCreateMode();
             
+            // 3. 強制清空品號，並讓游標聚焦在品號輸入框
             const itemNoInput = document.getElementById("form-item-no");
             itemNoInput.value = "";
             itemNoInput.focus();
             
+            // 4. 將剛剛暫存的所有規格數值重新回填補上
             const nameInput = document.getElementById("form-item-name");
             nameInput.value = currentItemName;
             if (nameInput.value && !nameInput.value.includes("複製")) {
                 nameInput.value = nameInput.value + " - 複製";
             }
-        }
 
+            document.getElementById("form-spec").value = currentSpec;
+            document.getElementById("form-pack-qty").value = currentPackQty;
+            document.getElementById("form-pallets-box-qty").value = currentPalletsBoxQty;
+            document.getElementById("form-base-qty").value = currentBaseQty;
+            document.getElementById("form-cubic").value = currentCubic;
+            document.getElementById("form-gross-weight").value = currentGrossWeight;
+            document.getElementById("form-length").value = currentLength;
+            document.getElementById("form-width").value = currentWidth;
+            document.getElementById("form-height").value = currentHeight;
+            document.getElementById("form-shelf-life").value = currentShelfLife;
+        }
         function resetFormToEditMode() {
             isCreateMode = false;
             document.getElementById("form-mode-title").innerHTML = `<i class="fa-solid fa-pen-to-square text-emerald-400"></i> 第二步：修改產品規格欄位`;
