@@ -68,20 +68,49 @@
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
 
-        // 💡 調整核心：每次開啟網頁或重新整理，一律先強制清除先前殘留的快取與 cookie
-        document.addEventListener("DOMContentLoaded", () => {
-            localStorage.removeItem("currentUser");
-            
-            document.cookie.split(";").forEach(function(c) { 
-                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-            });
 
+        // 1. 網頁剛開啟初始化：確保每次「全新開啟」或「重新整理」時，若非正常選單狀態就重設
+        document.addEventListener("DOMContentLoaded", () => {
+            // 改讀取 sessionStorage
+            const cachedUser = sessionStorage.getItem("currentUser");
+            
+            if (cachedUser) {
+                try {
+                    const userObj = JSON.parse(cachedUser);
+                    renderMenuByRole(userObj);
+                    return;
+                } catch(e) {
+                    sessionStorage.removeItem("currentUser");
+                }
+            }
+
+            // 初始化乾淨的登入介面
             document.getElementById("auth-id").value = "";
             document.getElementById("auth-pass").value = "";
             document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
             document.getElementById("menu-section").classList.add("hidden");
             document.getElementById("login-section").classList.remove("hidden");
         });
+
+        // 2. 登入成功時：將憑證寫入 sessionStorage
+        // 請在 submitAuth() 驗證成功的地方，將 localStorage 改為 sessionStorage
+        // 找到這行並修改：
+        sessionStorage.setItem("currentUser", JSON.stringify(sessionUser)); // 確保改為 sessionStorage
+
+        // 3. 點擊登出系統時：徹徹底底清除所有快取記憶
+        function handleLogout() {
+            sessionStorage.removeItem("currentUser"); // 🌟 清除安全快取
+            sessionStorage.clear();
+
+            document.getElementById("auth-id").value = "";
+            document.getElementById("auth-pass").value = "";
+            document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
+            document.getElementById("menu-section").classList.add("hidden");
+            document.getElementById("login-section").classList.remove("hidden");
+
+            // 強制重新整理
+            window.location.reload();
+        }
 
         // 登入驗證邏輯
         async function submitAuth() {
@@ -102,7 +131,7 @@
                     display_name: userId === "1" ? "測試管理員" : "離線人員",
                     role: isTestAdmin ? "admin" : "user"
                 };
-                localStorage.setItem("currentUser", JSON.stringify(offlineUser));
+                sessionStorage.setItem("currentUser", JSON.stringify(offlineUser));
                 renderMenuByRole(offlineUser);
                 return;
             }
@@ -110,7 +139,7 @@
             btnSubmit.disabled = true;
             btnSubmit.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> 驗證中...`;
 
-            try {
+           try {
                 const res = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(userId)}&select=*`, {
                     headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
                 });
@@ -122,13 +151,15 @@
                     const matchedUser = users[0];
                     let userRole = matchedUser.role ? matchedUser.role.trim().toLowerCase() : "user";
                     
+                    // 🌟【終極修正】：在這裡，一定要把 matchedUser.id (也就是資料庫 users 表格的流水號整數) 包進去！
                     const sessionUser = { 
+                        id: matchedUser.id,           // 👈 關鍵行：補上這行，把數字 ID 帶出來！
                         username: matchedUser.username, 
                         display_name: matchedUser.display_name || matchedUser.username, 
                         role: userRole 
                     };
 
-                    localStorage.setItem("currentUser", JSON.stringify(sessionUser));
+                    sessionStorage.setItem("currentUser", JSON.stringify(sessionUser));
                     renderMenuByRole(sessionUser);
                 } else {
                     alert("❌ 工號或密碼錯誤，請重新確認！");
@@ -152,7 +183,8 @@
             const menuItems = [
                 {
                     id: 'picking',
-                    allowedRoles: 'all',
+                    //allowedRoles: 'all',
+                    allowedRoles: 'admin',
                     html: `
                         <a href="pda_picking.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-blue-500/50 hover:shadow-blue-900/20 transition-all duration-200 group block">
                             <div class="bg-blue-500/10 text-blue-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
@@ -169,6 +201,7 @@
                 },
                 {
                     id: 'admin_dashboard',
+                    //allowedRoles: ['admin', 'supervisor'],
                     allowedRoles: ['admin'],
                     html: `
                         <a href="order_dashboard.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-indigo-500/50 hover:shadow-indigo-900/20 transition-all duration-200 group block">
@@ -247,11 +280,23 @@
             // 💡 調整核心：動態將目前登入使用者的 username 綁定到修改密碼連結上
             document.getElementById("link-change-password").href = `change_password.html?picker_id=${encodeURIComponent(userObject.username)}`;
 
+   
             // 調整畫面元素顯示
             document.getElementById("user-display-name").innerText = userObject.display_name;
-            document.getElementById("user-role-tag").innerText = role.toUpperCase();
+
+            // 🌟 核心修改：將權限英文轉換為對應的中文化職稱描述
+            let roleChinese = "出貨人員"; // 預設：其他角色顯示為出貨人員
+            const currentRole = String(role).toLowerCase().trim();
+
+            if (currentRole === "admin") {
+                roleChinese = "系統管理員";
+            } else if (currentRole === "supervisor") {
+                roleChinese = "接單人員";
+            }
+
+            // 將中文化職稱寫入畫面的角色標籤中
+            document.getElementById("user-role-tag").innerText = roleChinese;
             document.getElementById("system-subtitle").innerText = "核心功能選單已載入";
-            
             document.getElementById("login-section").classList.add("hidden");
             document.getElementById("menu-section").classList.remove("hidden");
         }
