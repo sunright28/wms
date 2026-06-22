@@ -11,26 +11,31 @@
 
     <script>
         (function() {
-            // 1. 解析網址列傳遞的參數
-            const params = new URLSearchParams(window.location.search);
-            const urlUser = params.get("username");
-            const urlRole = params.get("role") ? params.get("role").trim().toLowerCase() : "";
-
-            // 2. 讀取本機登入憑證快取
-            const cachedData = localStorage.getItem("currentUser");
-            let cachedUser = null;
-            if (cachedData) {
-                try { cachedUser = JSON.parse(cachedData); } catch(e) {}
+            // 1. 嚴格讀取單一登入記憶 (改用安全期 Session)
+            const cachedData = sessionStorage.getItem("currentUser");
+            
+            if (!cachedData) {
+                alert("🚨 安全警告：偵測到非法存取！請先從主系統登入驗證。");
+                window.location.href = "index.html";
+                return;
             }
 
-            // 3. 升級版資安交叉核對（修正離線測試工號與名稱不對稱導致的阻擋問題）
-            // 只要確認本機快取存在，且快取內的職等與網址上的職等確實皆為最高的 'admin' 即可放行
-            const isCachedAdmin = (cachedUser && cachedUser.role && cachedUser.role.trim().toLowerCase() === 'admin');
-            const isUrlAdmin = (urlRole === 'admin');
+            try {
+                const userObj = JSON.parse(cachedData);
+                const role = userObj.role ? userObj.role.trim().toLowerCase() : "";
 
-            if (!isCachedAdmin || !isUrlAdmin) {
-                alert("❌ 安全攔截：偵測到非法直接存取！\n進入管理員訂單控制台需具備【系統管理員 (Admin)】身分，請由系統首頁正常登入。");
-                window.location.replace("index.html"); // 強制踢回首頁，且不留瀏覽器歷史紀錄
+                // 2. 核對職責權限：後台管理網頁只允許 admin 或 supervisor 進入
+                if (role !== "admin" && role !== "supervisor") {
+                    alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
+                    window.location.href = "index.html";
+                    return;
+                }
+                
+                // 全域放行變數，供網頁後續功能使用
+                window.CURRENT_LOGIN_USER = userObj;
+            } catch (e) {
+                sessionStorage.removeItem("currentUser");
+                window.location.href = "index.html";
             }
         })();
     </script>
@@ -329,18 +334,65 @@
             } catch(e) { container.innerHTML = `<div class="text-red-400">無法讀取明細</div>`; }
         }
 
-        // ❌ 刪除整筆訂單
+  // ❌ 修正版：刪除整筆訂單（包含刪除頂層 orders 表主紀錄）
         async function deleteEntireOrderGroup(vendor, date, palletIds) {
-            if(!confirm(`🚨 永久刪除訂單核心警告！\n\n確定要永久刪除客戶 [ ${vendor} ] 的整筆訂單嗎？\n這將一併永久刪除底下的 ${palletIds.length} 個棧板以及所有關聯物料，資料將完全抹除！`)) return;
+            if(!confirm(`🚨 永久刪除訂單核心警告！\n\n確定要永久刪除客戶 [ ${vendor} ] 的整筆訂單嗎？\n這將一併永久刪除頂層波次單據(orders)、底下 ${palletIds.length} 個棧板以及所有關聯物料，資料將完全抹除！`)) return;
 
             try {
+                // 1. 取得這批棧板對應的 orders 總檔 ID (從第一個棧板資料取得 order_id)
+                // 備註：fetchOrdersByGroup 聚合時已有將 pallet.order_id 收集起來
+                let targetOrderId = null;
+                
+                // 2. 先依序將底層明細與棧板檔抹除 (由下而上，防範外鍵約束阻擋)
                 for(let pid of palletIds) {
-                    await fetch(`${SUPABASE_URL}/rest/v1/pallet_items?order_pallet_id=eq.${pid}`, { method: "DELETE", headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } });
-                    await fetch(`${SUPABASE_URL}/rest/v1/pallet_orders?id=eq.${pid}`, { method: "DELETE", headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } });
+                    // 順便在刪除前從雲端確認這個棧板關聯的 orders 表 id 是多少
+                    if(!targetOrderId) {
+                        try {
+                            const checkOrderRes = await fetch(`${SUPABASE_URL}/rest/v1/pallet_orders?id=eq.${pid}&select=order_id`, {
+                                headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+                            });
+                            const checkData = await checkOrderRes.json();
+                            if(checkData && checkData.length > 0) {
+                                targetOrderId = checkData[0].order_id;
+                            }
+                        } catch(e) { console.error("嘗試獲取 orders 主檔ID時發生異常", e); }
+                    }
+
+                    // 刪除該棧板下的所有物料細節 (pallet_items)
+                    await fetch(`${SUPABASE_URL}/rest/v1/pallet_items?order_pallet_id=eq.${pid}`, { 
+                        method: "DELETE", 
+                        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } 
+                    });
+                    
+                    // 刪除該棧板主檔紀錄 (pallet_orders)
+                    await fetch(`${SUPABASE_URL}/rest/v1/pallet_orders?id=eq.${pid}`, { 
+                        method: "DELETE", 
+                        headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } 
+                    });
                 }
-                alert(`🗑️ 該訂單及其附屬的 ${palletIds.length} 個棧板已完全永久刪除！`);
-                fetchOrdersByGroup();
-            } catch (err) { alert(`刪除異常：${err.message}`); }
+
+                // 🌟 3. 重點補救：如果找到了對應的 orders 表主鍵 ID，將其徹底從資料庫中刪除
+                if (targetOrderId) {
+                    const deleteMainOrderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${targetOrderId}`, {
+                        method: "DELETE",
+                        headers: { 
+                            "apikey": SUPABASE_KEY, 
+                            "Authorization": `Bearer ${SUPABASE_KEY}`,
+                            "Prefer": "return=minimal"
+                        }
+                    });
+                    
+                    if(!deleteMainOrderRes.ok) {
+                        console.warn("提示：底層棧板已清除，但 orders 總檔刪除時回應異常。可能已被串聯刪除。");
+                    }
+                }
+
+                alert(`🗑️ 該訂單總檔(orders)及其附屬的 ${palletIds.length} 個棧板、關聯物料已完全永久刪除！`);
+                fetchOrdersByGroup(); // 重新整理看板畫面
+                
+            } catch (err) { 
+                alert(`刪除異常：${err.message}`); 
+            }
         }
 
         // 🔄 退回未撿貨狀態

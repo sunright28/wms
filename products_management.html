@@ -7,62 +7,37 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
-        // 🔒【終極安全性檢查鎖】：防直接開啟、防手動竄改網址參數
-        let currentOperator = "未明管理員";
-        let currentRole = "";
+        // 貼在 5 個子網頁 body 下方第一個 <script> 最頂端
+        let CURRENT_USER_ID = "";
+        let CURRENT_USER_ROLE = "";
+        let CURRENT_USER_NAME = "";
 
         (function() {
-            // 1. 取得網址列上的參數
-            const urlParams = new URLSearchParams(window.location.search);
-            const urlUser = urlParams.get("username");
-            const urlRole = (urlParams.get("role") || "").trim().toLowerCase();
-
-            // 2. 取得瀏覽器快取 (localStorage)
-            const cachedUser = localStorage.getItem("currentUser");
-
-            // 🛑 漏洞攔截點 A：如果是直接輸入網址進來（網址沒有帶帳號或權限參數），直接踢掉
-            if (!urlUser || !urlRole) {
-                alert("❌ 安全攔截：偵測到非法直接存取！請由系統首頁正常登入進入。");
-                localStorage.removeItem("currentUser"); // 順便洗掉殘留快取
-                window.location.replace("index.html");
-                return;
-            }
-
-            // 🛑 漏洞攔截點 B：如果連快取都沒有，代表根本沒登入過
-            if (!cachedUser) {
-                alert("❌ 安全攔截：您尚未登入系統，請先進行身分驗證！");
-                window.location.replace("index.html");
+            const cachedData = sessionStorage.getItem("currentUser");
+            
+            if (!cachedData) {
+                alert("🚨 安全警告：偵測到非法存取！請先從主系統登入驗證。");
+                window.location.href = "index.html";
                 return;
             }
 
             try {
-                const userObj = JSON.parse(cachedUser);
-                const cacheUser = userObj.display_name;
-                const cacheRole = (userObj.role || "").trim().toLowerCase();
+                const userObj = JSON.parse(cachedData);
+                
+                // 🌟 在這裡精確提取三個核心變數，並存入全域供整頁程式使用
+                CURRENT_USER_ID = userObj.username;                    // 帳號/工號
+                CURRENT_USER_ROLE = userObj.role.trim().toLowerCase(); // 權限角色
+                CURRENT_USER_NAME = userObj.display_name;              // 顯示姓名
 
-                // 🛑 漏洞攔截點 C（防作弊關鍵）：比對「網址帶的權限」和「資料庫查出來的快取權限」是否吻合！
-                // 如果有人手動把網址改成 ?role=admin，但快取內其實是工讀生，這裡就會抓包！
-                if (urlUser !== cacheUser || urlRole !== cacheRole) {
-                    alert("❌ 安全警告：偵測到網址參數遭蓄意竄改，系統已鎖定存取！");
-                    localStorage.removeItem("currentUser");
-                    window.location.replace("index.html");
+                // 後台網頁的權限過濾（撿貨頁 pda_picking.html 可拿掉這段 if 判斷）
+                if (CURRENT_USER_ROLE !== "admin" && CURRENT_USER_ROLE !== "supervisor") {
+                    alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
+                    window.location.href = "index.html";
                     return;
                 }
-
-                // 3. 驗證通過，正式放行並指派變數
-                currentOperator = cacheUser;
-                currentRole = cacheRole;
-
-                // 🛑 漏洞攔截點 D：確認其身分是否符合管理階層
-                if (currentRole !== "admin" && currentRole !== "supervisor") {
-                    alert("❌ 權限不足：您不具備【管理員】或【主管】身分，拒絕存取此維護系統！");
-                    window.location.replace("index.html");
-                }
-
-            } catch(e) {
-                alert("❌ 系統安全性錯誤，請重新登入！");
-                localStorage.removeItem("currentUser");
-                window.location.replace("index.html");
+            } catch (e) {
+                sessionStorage.removeItem("currentUser");
+                window.location.href = "index.html";
             }
         })();
     </script>
@@ -205,12 +180,12 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             // 將經上方驗證通過的正確操作者姓名放到畫面上
-            document.getElementById("operator-display").innerText = currentOperator;
+            document.getElementById("operator-display").innerText = CURRENT_USER_NAME;
             
             const btnShowAdd = document.getElementById("btn-show-add-mode");
             if (btnShowAdd) {
                 // 只允許管理員顯示新增按鈕
-                if (currentRole === "admin") {
+                if (CURRENT_USER_ROLE=== "admin") {
                     btnShowAdd.style.display = "block";
                 } else {
                     btnShowAdd.style.display = "none";
@@ -304,7 +279,7 @@
 
                     const btnCopy = document.getElementById("btn-copy-product");
                     if (btnCopy) {
-                        btnCopy.style.display = (currentRole === "admin") ? "block" : "none";
+                        btnCopy.style.display = (CURRENT_USER_ROLE === "admin") ? "block" : "none";
                     }
 
                     document.getElementById("edit-form-section").classList.remove("hidden");
@@ -435,7 +410,7 @@ function handleCopyToNewProduct() {
 
         async function executeInsertProduct() {
             // 安全防線：再次確保只有 admin 可以新增
-            if (currentRole !== "admin") {
+            if (CURRENT_USER_ROLE !== "admin") {
                 alert("❌ 權限不足：您的帳號權限無法執行新增產品操作！");
                 return;
             }
@@ -462,7 +437,7 @@ function handleCopyToNewProduct() {
                 width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
-                updated_by: `${currentOperator}`,
+                updated_by: CURRENT_USER_NAME,
                 created_at: new Date().toISOString()
             };
 
@@ -522,7 +497,7 @@ function handleCopyToNewProduct() {
                 width: document.getElementById("form-width").value ? parseFloat(document.getElementById("form-width").value) : null,
                 height: document.getElementById("form-height").value ? parseFloat(document.getElementById("form-height").value) : null,
                 shelf_life: document.getElementById("form-shelf-life").value.trim(),
-                updated_by: `${currentOperator}`,
+                updated_by: CURRENT_USER_NAME,
                 updated_at: todayDateString
             };
 

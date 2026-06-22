@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS 倉儲管理系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen flex items-center justify-center p-4">
+
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(30,58,138,0.3),transparent_45%)] pointer-events-none"></div>
+
+    <div class="max-w-md w-full space-y-8 relative z-10">
+        
+        <div class="text-center space-y-2">
+            <div class="inline-flex bg-indigo-600/20 text-indigo-400 p-4 rounded-3xl border border-indigo-500/30 shadow-inner mb-2">
+                <i class="fa-solid fa-warehouse text-4xl"></i>
+            </div>
+            <h1 class="text-2xl font-black tracking-widest bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                WMS 行動倉儲作業系統
+            </h1>
+            <p id="system-subtitle" class="text-xs text-slate-400 tracking-wider">請先登入系統以載入您的作業權限</p>
+        </div>
+
+        <div id="login-section" class="bg-slate-800/90 p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-5">
+            <div class="space-y-3 text-sm">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">作業工號 (User ID)</label>
+                    <input type="text" id="auth-id" placeholder="請輸入工號" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">安全密碼 (Password)</label>
+                    <input type="password" id="auth-pass" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <button onclick="submitAuth()" id="btn-auth-submit" class="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl mt-2 transition-all flex items-center justify-center cursor-pointer">
+                    登入系統
+                </button>
+            </div>
+        </div>
+
+        <div id="menu-section" class="hidden space-y-4">
+            
+            <div class="flex justify-between items-center bg-slate-800/50 px-4 py-3 rounded-xl border border-slate-700/50">
+                <div class="text-xs font-medium text-slate-300">
+                    你好，<span id="user-display-name" class="text-indigo-400 font-bold"></span> 
+                    (<span id="user-role-tag" class="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-400"></span>)
+                </div>
+                <div class="flex items-center gap-4 text-xs font-medium">
+                    <a id="link-change-password" href="#" class="text-amber-400 hover:text-amber-300 transition-colors">
+                        <i class="fa-solid fa-key"></i> 修改密碼
+                    </a>
+                    <span class="text-slate-600">|</span>
+                    <button onclick="handleLogout()" class="text-rose-400 hover:text-rose-300 cursor-pointer">
+                        <i class="fa-solid fa-right-from-bracket"></i> 登出系統
+                    </button>
+                </div>
+            </div>
+
+            <div id="dynamic-buttons" class="space-y-3">
+                </div>
+        </div>
+
+        <p class="text-center text-[11px] text-slate-500 font-mono">Secure Role-Based Routing | © 2026 WMS Control.</p>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
+
+
+        // 1. 網頁剛開啟初始化：確保每次「全新開啟」或「重新整理」時，若非正常選單狀態就重設
+        document.addEventListener("DOMContentLoaded", () => {
+            // 改讀取 sessionStorage
+            const cachedUser = sessionStorage.getItem("currentUser");
+            
+            if (cachedUser) {
+                try {
+                    const userObj = JSON.parse(cachedUser);
+                    renderMenuByRole(userObj);
+                    return;
+                } catch(e) {
+                    sessionStorage.removeItem("currentUser");
+                }
+            }
+
+            // 初始化乾淨的登入介面
+            document.getElementById("auth-id").value = "";
+            document.getElementById("auth-pass").value = "";
+            document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
+            document.getElementById("menu-section").classList.add("hidden");
+            document.getElementById("login-section").classList.remove("hidden");
+        });
+
+        // 2. 登入成功時：將憑證寫入 sessionStorage
+        // 請在 submitAuth() 驗證成功的地方，將 localStorage 改為 sessionStorage
+        // 找到這行並修改：
+        sessionStorage.setItem("currentUser", JSON.stringify(sessionUser)); // 確保改為 sessionStorage
+
+        // 3. 點擊登出系統時：徹徹底底清除所有快取記憶
+        function handleLogout() {
+            sessionStorage.removeItem("currentUser"); // 🌟 清除安全快取
+            sessionStorage.clear();
+
+            document.getElementById("auth-id").value = "";
+            document.getElementById("auth-pass").value = "";
+            document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
+            document.getElementById("menu-section").classList.add("hidden");
+            document.getElementById("login-section").classList.remove("hidden");
+
+            // 強制重新整理
+            window.location.reload();
+        }
+
+        // 登入驗證邏輯
+        async function submitAuth() {
+            const userId = document.getElementById("auth-id").value.trim();
+            const userPass = document.getElementById("auth-pass").value.trim();
+            const btnSubmit = document.getElementById("btn-auth-submit");
+
+            if (!userId || !userPass) {
+                alert("請填寫工號與密碼");
+                return;
+            }
+
+            // 離線測試後門
+            if (userPass === "admin123") {
+                const isTestAdmin = (userId === "120404" || userId === "1" || userId.toLowerCase().includes("admin"));
+                const offlineUser = {
+                    username: userId,
+                    display_name: userId === "1" ? "測試管理員" : "離線人員",
+                    role: isTestAdmin ? "admin" : "user"
+                };
+                sessionStorage.setItem("currentUser", JSON.stringify(offlineUser));
+                renderMenuByRole(offlineUser);
+                return;
+            }
+
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> 驗證中...`;
+
+           try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(userId)}&select=*`, {
+                    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+                });
+                
+                if (!res.ok) throw new Error("與資料庫連線失敗");
+                const users = await res.json();
+
+                if (users.length > 0 && String(users[0].password) === String(userPass)) {
+                    const matchedUser = users[0];
+                    let userRole = matchedUser.role ? matchedUser.role.trim().toLowerCase() : "user";
+                    
+                    // 🌟【終極修正】：在這裡，一定要把 matchedUser.id (也就是資料庫 users 表格的流水號整數) 包進去！
+                    const sessionUser = { 
+                        id: matchedUser.id,           // 👈 關鍵行：補上這行，把數字 ID 帶出來！
+                        username: matchedUser.username, 
+                        display_name: matchedUser.display_name || matchedUser.username, 
+                        role: userRole 
+                    };
+
+                    sessionStorage.setItem("currentUser", JSON.stringify(sessionUser));
+                    renderMenuByRole(sessionUser);
+                } else {
+                    alert("❌ 工號或密碼錯誤，請重新確認！");
+                }
+
+            } catch (err) {
+                alert(`連線技術錯誤: ${err.message}\n(離線測試可輸入品號搭配密碼 admin123 快速登入)`);
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = "登入系統";
+            }
+        }
+
+        // 核心：根據角色權限決定「渲染哪些按鈕」
+        function renderMenuByRole(userObject) {
+            const role = userObject.role;
+            const container = document.getElementById("dynamic-buttons");
+            container.innerHTML = ""; 
+
+            // 💡 調整核心：取消了所有項目的前綴編號 (1., 2., 3...)，並移除了密碼變更卡片
+            const menuItems = [
+                {
+                    id: 'picking',
+                    allowedRoles: 'all',
+                    html: `
+                        <a href="pda_picking.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-blue-500/50 hover:shadow-blue-900/20 transition-all duration-200 group block">
+                            <div class="bg-blue-500/10 text-blue-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
+                                <i class="fa-solid fa-barcode text-xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h2 class="text-base font-bold text-slate-200 group-hover:text-blue-400 transition-colors">撿貨作業</h2>
+                                <p class="text-xs text-slate-400 mt-0.5">現場 PDA / PAD 刷碼、效期確認及棧板點收</p>
+                            </div>
+                            <div class="text-slate-500 group-hover:text-blue-400 transition-colors">
+                                <i class="fa-solid fa-chevron-right text-sm"></i>
+                            </div>
+                        </a>`
+                },
+                {
+                    id: 'admin_dashboard',
+                    allowedRoles: ['admin', 'supervisor'],
+                    html: `
+                        <a href="order_dashboard.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-indigo-500/50 hover:shadow-indigo-900/20 transition-all duration-200 group block">
+                            <div class="bg-indigo-500/10 text-indigo-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
+                                <i class="fa-solid fa-sliders text-xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h2 class="text-base font-bold text-slate-200 group-hover:text-indigo-400 transition-colors">訂單管理 (後台)</h2>
+                                <p class="text-xs text-slate-400 mt-0.5">進度重置、訂單管理與出貨排程分配</p>
+                            </div>
+                            <div class="text-slate-500 group-hover:text-indigo-400 transition-colors">
+                                <i class="fa-solid fa-chevron-right text-sm"></i>
+                            </div>
+                        </a>`
+                },
+                {
+                    id: 'users_management',
+                    allowedRoles: ['admin'],
+                    html: `
+                        <a href="users_management.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-emerald-500/50 hover:shadow-emerald-900/20 transition-all duration-200 group block">
+                            <div class="bg-emerald-500/10 text-emerald-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
+                                <i class="fa-solid fa-users-gear"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h2 class="text-base font-bold text-slate-200 group-hover:text-emerald-400 transition-colors">人員權限管理</h2>
+                                <p class="text-xs text-slate-400 mt-0.5">系統人員工號開通、密碼強制重設與職責調整</p>
+                            </div>
+                            <div class="text-slate-500 group-hover:text-emerald-400 transition-colors">
+                                <i class="fa-solid fa-chevron-right text-sm"></i>
+                            </div>
+                        </a>`
+                },
+                {
+                    id: 'products',
+                    allowedRoles: ['admin', 'supervisor'],
+                    html: `
+                        <a href="products_management.html?username=${encodeURIComponent(userObject.display_name)}&role=${encodeURIComponent(userObject.role)}" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-emerald-500/50 hover:shadow-emerald-900/20 transition-all duration-200 group block">
+                            <div class="bg-emerald-500/10 text-emerald-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
+                                <i class="fa-solid fa-boxes-packing text-xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h2 class="text-base font-bold text-slate-200 group-hover:text-emerald-400 transition-colors">產品主檔維護</h2>
+                                <p class="text-xs text-slate-400 mt-0.5">長寬高、才積、入數及毛重等基礎參數變更</p>
+                            </div>
+                            <div class="text-slate-500 group-hover:text-emerald-400 transition-colors">
+                                <i class="fa-solid fa-chevron-right text-sm"></i>
+                            </div>
+                        </a>`
+                },
+                {
+                    id: 'download',
+                    allowedRoles: ['admin', 'supervisor'],
+                    html: `
+                        <a href="file_download.html?username=${encodeURIComponent(userObject.display_name)}&role=${encodeURIComponent(userObject.role)}" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-cyan-500/50 hover:shadow-cyan-900/20 transition-all duration-200 group block">
+                            <div class="bg-cyan-500/10 text-cyan-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
+                                <i class="fa-solid fa-cloud-arrow-down text-xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h2 class="text-base font-bold text-slate-200 group-hover:text-cyan-400 transition-colors">檔案下載專區</h2>
+                                <p class="text-xs text-slate-400 mt-0.5">相關報表與核心營運文件下載</p>
+                            </div>
+                            <div class="text-slate-500 group-hover:text-cyan-400 transition-colors">
+                                <i class="fa-solid fa-chevron-right text-sm"></i>
+                            </div>
+                        </a>`
+                }
+            ];
+
+            // 過濾並加入符合權限的按鈕
+            menuItems.forEach(item => {
+                if (item.allowedRoles === 'all' || item.allowedRoles.includes(role)) {
+                    container.insertAdjacentHTML('beforeend', item.html);
+                }
+            });
+
+            // 💡 調整核心：動態將目前登入使用者的 username 綁定到修改密碼連結上
+            document.getElementById("link-change-password").href = `change_password.html?picker_id=${encodeURIComponent(userObject.username)}`;
+
+   
+            // 調整畫面元素顯示
+            document.getElementById("user-display-name").innerText = userObject.display_name;
+
+            // 🌟 核心修改：將權限英文轉換為對應的中文化職稱描述
+            let roleChinese = "出貨人員"; // 預設：其他角色顯示為出貨人員
+            const currentRole = String(role).toLowerCase().trim();
+
+            if (currentRole === "admin") {
+                roleChinese = "系統管理員";
+            } else if (currentRole === "supervisor") {
+                roleChinese = "接單人員";
+            }
+
+            // 將中文化職稱寫入畫面的角色標籤中
+            document.getElementById("user-role-tag").innerText = roleChinese;
+            document.getElementById("system-subtitle").innerText = "核心功能選單已載入";
+            document.getElementById("login-section").classList.add("hidden");
+            document.getElementById("menu-section").classList.remove("hidden");
+        }
+
+        // 登出系統
+        function handleLogout() {
+            localStorage.removeItem("currentUser");
+            document.getElementById("auth-id").value = "";
+            document.getElementById("auth-pass").value = "";
+            
+            document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
+            document.getElementById("menu-section").classList.add("hidden");
+            document.getElementById("login-section").classList.remove("hidden");
+        }
+    </script>
+</body>
+</html>

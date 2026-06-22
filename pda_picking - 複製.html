@@ -464,15 +464,12 @@ document.addEventListener("DOMContentLoaded",()=>{
         // 🎯 進入明細撿貨頁面
         async function startPicking(palletId) {
             currentPalletId = palletId;
-            let pInfo = activePalletObject || {};
+            const pInfo = activePalletObject;
+            if(!pInfo) return;
      
-            // 🎯【核心修正：防線完全改用字串安全比對，避免 NaN 造成阻斷】
+            // 🎯【更新防線】：只有當狀態是已完成，或是撿貨中「且非本人」時才攔截
             const checkStatus = pInfo.status || '待撿貨';
-            const dbPickerId = pInfo.picker_id ? String(pInfo.picker_id).trim() : '';
-            const myIdStr = currentPickerId ? String(currentPickerId).trim() : '';
-            
-            // 只有當「真的是別人鎖定」或「已完成」才攔截；若是本人工號，或者是待撿貨，就直接放行
-            const isNotMyJob = (checkStatus === "撿貨中" && dbPickerId !== "" && dbPickerId !== myIdStr);
+            const isNotMyJob = (checkStatus === "撿貨中" && pInfo.picker_id !== null && parseInt(pInfo.picker_id) !== parseInt(currentPickerTableId));
             
             if (isNotMyJob || checkStatus === "已完成") {
                 playBeep(300, 0.3);
@@ -481,42 +478,6 @@ document.addEventListener("DOMContentLoaded",()=>{
                 return;
             }
 
-            // ================= 🌟【強制寫入主表格區塊】=================
-            // 只要成功通過上面的防線（代表是待撿貨，或是本人續接），就立刻強制同步到雲端主表格
-            const nowISO = new Date().toISOString();
-            
-            // 同步更新本地物件，防止點擊返回時畫面不同步
-            pInfo.status = "撿貨中";
-            pInfo.picker_id = myIdStr;
-            pInfo.start_time = nowISO;
-
-            try {
-                console.log(`正在強制更新主表格 pallet_orders ID: ${palletId} ...`);
-                const syncResponse = await fetch(`${SUPABASE_URL}/rest/v1/pallet_orders?id=eq.${palletId}`, {
-                    method: "PATCH",
-                    headers: {
-                        "apikey": SUPABASE_KEY,
-                        "Authorization": `Bearer ${SUPABASE_KEY}`,
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        status: "撿貨中",
-                        picker_id: myIdStr,   // 確保填入的是您的登入工號字串
-                        start_time: nowISO    // 確保填入正確的 ISO 開始時間
-                    })
-                });
-
-                if (!syncResponse.ok) {
-                    console.error("雲端主表格 pallet_orders 寫入失敗:", await syncResponse.text());
-                } else {
-                    console.log("✅ 雲端主表格 pallet_orders 的 status、picker_id、start_time 已成功寫入！");
-                }
-            } catch (syncErr) {
-                console.error("主表格網路連線寫入異常:", syncErr);
-            }
-            // ==========================================================
-
-            // 以下完全保留您原本運作 100% 正常的畫面渲染與明細載入邏輯，不作任何更動
             document.getElementById("lbl-pallet-no").innerText = pInfo.pallet_no || "-";
             document.getElementById("lbl-vendor").innerText = pInfo.ship_vendor || "未指定";
             document.getElementById("lbl-date").innerText = pInfo.ship_date || "-";

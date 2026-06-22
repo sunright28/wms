@@ -14,29 +14,41 @@
 <body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8">
 
     <script>
-        (function() {
-            // 1. 解析網址列傳遞的參數
-            const params = new URLSearchParams(window.location.search);
-            const urlUser = params.get("username");
-            const urlRole = params.get("role") ? params.get("role").trim().toLowerCase() : "";
+        // 貼在 5 個子網頁 body 下方第一個 <script> 最頂端
+        let CURRENT_USER_ID = "";
+        let CURRENT_USER_ROLE = "";
+        let CURRENT_USER_NAME = "";
 
-            // 2. 讀取本機登入憑證快取
-            const cachedData = localStorage.getItem("currentUser");
-            let cachedUser = null;
-            if (cachedData) {
-                try { cachedUser = JSON.parse(cachedData); } catch(e) {}
+        (function() {
+            const cachedData = sessionStorage.getItem("currentUser");
+            
+            if (!cachedData) {
+                alert("🚨 安全警告：偵測到非法存取！請先從主系統登入驗證。");
+                window.location.href = "index.html";
+                return;
             }
 
-            // 3. 交叉安全核對：必須有快取憑證，且快取與網址上的權限職等皆為最高階 'admin' 始放行
-            const isCachedAdmin = (cachedUser && cachedUser.role && cachedUser.role.trim().toLowerCase() === 'admin');
-            const isUrlAdmin = (urlRole === 'admin');
+            try {
+                const userObj = JSON.parse(cachedData);
+                
+                // 🌟 在這裡精確提取三個核心變數，並存入全域供整頁程式使用
+                CURRENT_USER_ID = userObj.username;                    // 帳號/工號
+                CURRENT_USER_ROLE = userObj.role.trim().toLowerCase(); // 權限角色
+                CURRENT_USER_NAME = userObj.display_name;              // 顯示姓名
 
-            if (!isCachedAdmin || !isUrlAdmin) {
-                alert("❌ 安全攔截：偵測到非法直接存取！\n進入管理員人員權限控制台需具備【系統管理員 (Admin)】身分，請由系統首頁正常登入。");
-                window.location.replace("index.html"); // 強制踢回首頁，不留歷史紀錄
+                // 後台網頁的權限過濾（撿貨頁 pda_picking.html 可拿掉這段 if 判斷）
+                if (CURRENT_USER_ROLE !== "admin" && CURRENT_USER_ROLE !== "supervisor") {
+                    alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
+                    window.location.href = "index.html";
+                    return;
+                }
+            } catch (e) {
+                sessionStorage.removeItem("currentUser");
+                window.location.href = "index.html";
             }
         })();
     </script>
+
 
     <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.05),transparent_45%)] pointer-events-none"></div>
 
@@ -146,8 +158,8 @@
 
         // 讀取網址參數以於表頭高亮渲染管理員尊稱
         const urlParams = new URLSearchParams(window.location.search);
-        const currentOperator = urlParams.get("username") || "進階管理員";
-        const currentRole = (urlParams.get("role") || "user").trim().toLowerCase();
+        const currentOperator = CURRENT_USER_NAME;
+        const currentRole = CURRENT_USER_ROLE;
 
         let allUsersCache = [];
 
