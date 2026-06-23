@@ -4,25 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>WMS行動撿貨系統_C)</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4">
-        document.addEventListener("DOMContentLoaded",()=>{
-        currentPickerTableId=1;
-        currentPickerId="PDA";
-        currentPickerName="PDA";
-        document.getElementById("page-orders").classList.remove("hidden");
-        loadOrders();
-        });
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://unpkg.com/html5-qrcode">
-document.addEventListener("DOMContentLoaded",()=>{
- currentPickerTableId=1;
- currentPickerId="PDA";
- currentPickerName="PDA";
- document.getElementById("page-orders").classList.remove("hidden");
- loadOrders();
-});
-</script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         @keyframes pulse-red {
             0%, 100% { border-color: #ef4444; background-color: #fef2f2; }
@@ -31,7 +15,6 @@ document.addEventListener("DOMContentLoaded",()=>{
         .error-flash {
             animation: pulse-red 0.4s ease-in-out 3;
         }
-        /* 調整 html5-qrcode 內部控制項，美化介面 */
         #qr-reader button {
             background-color: #3b82f6;
             color: white;
@@ -43,18 +26,18 @@ document.addEventListener("DOMContentLoaded",()=>{
             cursor: pointer;
         }
         #qr-reader img { display: none !important; }
-        /* 讓掃描框維持錄影的活體動態，不結凍 */
         #qr-reader video {
             object-fit: cover !important;
         }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans antialiased select-none">
-        <script>
+<script>
             // 貼在 5 個子網頁 body 下方第一個 <script> 最頂端
             let CURRENT_USER_ID = "";
             let CURRENT_USER_ROLE = "";
             let CURRENT_USER_NAME = "";
+            let CURRENT_USER_TABLE_ID = null; // 🌟【關鍵新增】：儲存 users 資料表的數字 id
 
             (function() {
                 const cachedData = sessionStorage.getItem("currentUser");
@@ -68,17 +51,18 @@ document.addEventListener("DOMContentLoaded",()=>{
                 try {
                     const userObj = JSON.parse(cachedData);
                     
-                    // 🌟 在這裡精確提取三個核心變數，並存入全域供整頁程式使用
-                    CURRENT_USER_ID = userObj.username;                    // 帳號/工號
-                    CURRENT_USER_ROLE = userObj.role.trim().toLowerCase(); // 權限角色
+                    // 🌟 精確提取變數，包含最核心的數字 id
+                    CURRENT_USER_TABLE_ID = userObj.id ? parseInt(userObj.id) : null; // 👈 提取數字 ID
+                    CURRENT_USER_ID = userObj.username;                    // 帳號/工號字串
+                    CURRENT_USER_ROLE = userObj.role ? userObj.role.trim().toLowerCase() : "user"; // 權限角色
                     CURRENT_USER_NAME = userObj.display_name;              // 顯示姓名
 
-                    // 後台網頁的權限過濾（撿貨頁 pda_picking.html 可拿掉這段 if 判斷）
-                    if (CURRENT_USER_ROLE !== "admin" && CURRENT_USER_ROLE !== "supervisor") {
-                        alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
-                        window.location.href = "index.html";
-                        return;
-                    }
+                    // 後台網頁的權限過濾（撿貨頁 pda_picking.html 可手動拿掉這段 if 判斷，但留著也沒關係，除非是出貨人員要用）
+                    // if (CURRENT_USER_ROLE !== "admin" && CURRENT_USER_ROLE !== "supervisor") {
+                    //     alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
+                    //     window.location.href = "index.html";
+                    //     return;
+                    // }
                 } catch (e) {
                     sessionStorage.removeItem("currentUser");
                     window.location.href = "index.html";
@@ -251,15 +235,7 @@ document.addEventListener("DOMContentLoaded",()=>{
                 window.location.href = "index.html"; 
             }
         }
-                document.addEventListener("DOMContentLoaded", () => {
 
-            document.getElementById("app-header").classList.remove("hidden");
-            document.getElementById("page-orders").classList.remove("hidden");
-
-            //document.getElementById("user-badge").innerText =`👤 ${currentPickerName}`;
-            document.getElementById("user-badge").innerText =`👤 ${CURRENT_USER_NAME}`;
-            loadOrders();
-        });
                 // 📅 初始化日期控制項（如果沒選，預設為今日 YYYY-MM-DD）
         function initFilterDate() {
             const dateInput = document.getElementById("filter-date");
@@ -466,14 +442,12 @@ document.addEventListener("DOMContentLoaded",()=>{
             currentPalletId = palletId;
             let pInfo = activePalletObject || {};
      
-            // 🎯【核心修正：防線完全改用字串安全比對，避免 NaN 造成阻斷】
+            // 🎯【安全防線】：比對工號字串
             const checkStatus = pInfo.status || '待撿貨';
             const dbPickerId = pInfo.picker_id ? String(pInfo.picker_id).trim() : '';
             const myIdStr = currentPickerId ? String(currentPickerId).trim() : '';
             
-            // 只有當「真的是別人鎖定」或「已完成」才攔截；若是本人工號，或者是待撿貨，就直接放行
             const isNotMyJob = (checkStatus === "撿貨中" && dbPickerId !== "" && dbPickerId !== myIdStr);
-            
             if (isNotMyJob || checkStatus === "已完成") {
                 playBeep(300, 0.3);
                 alert(`🚫 點選失敗：該棧板剛剛已被其他人員更新或完工。系統將自動重新整理清單。`);
@@ -481,17 +455,19 @@ document.addEventListener("DOMContentLoaded",()=>{
                 return;
             }
 
-            // ================= 🌟【強制寫入主表格區塊】=================
-            // 只要成功通過上面的防線（代表是待撿貨，或是本人續接），就立刻強制同步到雲端主表格
+            // ================= 🌟【核心修正：第一個品項開始時，強制寫入主表格 pallet_orders】=================
             const nowISO = new Date().toISOString();
             
-            // 同步更新本地物件，防止點擊返回時畫面不同步
+            // 抓取全域的數字型態 ID（從 index 傳過來解開的整數）
+            const numericPickerId = parseInt(currentPickerTableId) || 1;
+
+            // 同步更新本地端記憶體快取
             pInfo.status = "撿貨中";
-            pInfo.picker_id = myIdStr;
+            pInfo.picker_id = myIdStr; 
             pInfo.start_time = nowISO;
 
             try {
-                console.log(`正在強制更新主表格 pallet_orders ID: ${palletId} ...`);
+                console.log(`正在更新主表格 pallet_orders ID: ${palletId}, 寫入的數字 ID: ${numericPickerId}`);
                 const syncResponse = await fetch(`${SUPABASE_URL}/rest/v1/pallet_orders?id=eq.${palletId}`, {
                     method: "PATCH",
                     headers: {
@@ -501,22 +477,20 @@ document.addEventListener("DOMContentLoaded",()=>{
                     },
                     body: JSON.stringify({
                         status: "撿貨中",
-                        picker_id: myIdStr,   // 確保填入的是您的登入工號字串
-                        start_time: nowISO    // 確保填入正確的 ISO 開始時間
+                        picker_id: numericPickerId, // 💡 丟入整數 ID，對齊 Supabase 外鍵
+                        start_time: nowISO
                     })
                 });
 
                 if (!syncResponse.ok) {
-                    console.error("雲端主表格 pallet_orders 寫入失敗:", await syncResponse.text());
+                    console.error("雲端主表格 pallet_orders 寫入失敗，原因：", await syncResponse.text());
                 } else {
-                    console.log("✅ 雲端主表格 pallet_orders 的 status、picker_id、start_time 已成功寫入！");
+                    console.log("✅ 雲端主表格 pallet_orders 的 status、picker_id、start_time 已成功同步寫入！");
                 }
             } catch (syncErr) {
                 console.error("主表格網路連線寫入異常:", syncErr);
             }
-            // ==========================================================
-
-            // 以下完全保留您原本運作 100% 正常的畫面渲染與明細載入邏輯，不作任何更動
+            // 以下完整保留原本的畫面渲染與明細載入邏輯，不作任何更動
             document.getElementById("lbl-pallet-no").innerText = pInfo.pallet_no || "-";
             document.getElementById("lbl-vendor").innerText = pInfo.ship_vendor || "未指定";
             document.getElementById("lbl-date").innerText = pInfo.ship_date || "-";
@@ -540,7 +514,6 @@ document.addEventListener("DOMContentLoaded",()=>{
                 if (!response.ok) throw new Error("物料明細撈取失敗");
                 const rawItems = await response.json();
 
-                // 💡 FIFO 與重量排序
                 rawItems.sort((a, b) => {
                     const weightA = parseFloat(a.unit_weight) || 0;
                     const weightB = parseFloat(b.unit_weight) || 0;
@@ -639,7 +612,6 @@ document.addEventListener("DOMContentLoaded",()=>{
                 if (loader) loader.classList.add("hidden");
             }
         }
-
         // 💾 效期回存
         async function updateExpiry(itemId, index) {
             const dateInput = document.getElementById(`input-exp-${itemId}`);
@@ -949,27 +921,30 @@ document.addEventListener("DOMContentLoaded",()=>{
  
 
         // 空白處點擊防呆
-// 🌟 網頁啟動初始化檢查（安全守衛）
+
+// 🎯 終極融合：全網頁只保留這一個 DOMContentLoaded 監聽器，絕不允許變數被洗掉
         document.addEventListener("DOMContentLoaded", () => {
-            // 🌟 改為讀取安全期 Session 記憶
-            const cachedUser = sessionStorage.getItem("currentUser");
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlUserTableId = urlParams.get('picker_table_id') || urlParams.get('id');
 
-            if (cachedUser) {
-                try {
-                    const userObj = JSON.parse(cachedUser);
-                    renderMenuByRole(userObj); // 如果有記憶，直接帶入選單，不清除
-                    return; 
-                } catch(e) {
-                    sessionStorage.removeItem("currentUser");
-                }
+            // 🌟 核心優先序：防闖警衛解鎖的ID > 網址帶入的ID > 預設值 1
+            if (CURRENT_USER_TABLE_ID) {
+                currentPickerTableId = parseInt(CURRENT_USER_TABLE_ID);
+            } else if (urlUserTableId) {
+                currentPickerTableId = parseInt(urlUserTableId);
+            } else {
+                currentPickerTableId = 1; 
             }
+            
+            // 綁定其餘顯示用的全域變數
+            currentPickerId = CURRENT_USER_ID || "PDA";      
+            currentPickerName = CURRENT_USER_NAME || "PDA";  
 
-            // 以下為原本的初始化清空畫面
-            document.getElementById("auth-id").value = "";
-            document.getElementById("auth-pass").value = "";
-            document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
-            document.getElementById("menu-section").classList.add("hidden");
-            document.getElementById("login-section").classList.remove("hidden");
+            console.log("🚀 [系統初始化成功] 目前登入者資料庫流水號數字 ID:", currentPickerTableId);
+
+            // 顯示主要訂單畫面並載入
+            document.getElementById("page-orders").classList.remove("hidden");
+            loadOrders();
         });
         // 實體 Enter 監聽器 (PDA槍用)
         document.addEventListener("keyup", (e) => {
@@ -996,15 +971,7 @@ document.addEventListener("DOMContentLoaded",()=>{
         }
 
 
-document.addEventListener("DOMContentLoaded", () => {
-    currentPickerTableId = 1;
-    // 🌟 確保直接讀取頂端「防闖警衛」解鎖成功的全域變數
-    currentPickerId = CURRENT_USER_ID || "PDA";      
-    currentPickerName = CURRENT_USER_NAME || "PDA";  
-    
-    document.getElementById("page-orders").classList.remove("hidden");
-    loadOrders();
-});
+
 </script>
 </body>
 </html>
