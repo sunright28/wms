@@ -40,7 +40,6 @@
         </div>
 
         <div id="menu-section" class="hidden space-y-4">
-            
             <div class="flex justify-between items-center bg-slate-800/50 px-4 py-3 rounded-xl border border-slate-700/50">
                 <div class="text-xs font-medium text-slate-300">
                     你好，<span id="user-display-name" class="text-indigo-400 font-bold"></span> 
@@ -51,14 +50,13 @@
                         <i class="fa-solid fa-key"></i> 修改密碼
                     </a>
                     <span class="text-slate-600">|</span>
-                    <button onclick="handleLogout()" class="text-rose-400 hover:text-rose-300 cursor-pointer">
+                    <button onclick="handleLogout()" class="text-rose-400 hover:text-rose-300 cursor-pointer bg-transparent border-0">
                         <i class="fa-solid fa-right-from-bracket"></i> 登出系統
                     </button>
                 </div>
             </div>
 
-            <div id="dynamic-buttons" class="space-y-3">
-                </div>
+            <div id="dynamic-buttons" class="space-y-3"></div>
         </div>
 
         <p class="text-center text-[11px] text-slate-500 font-mono">Secure Role-Based Routing | © 2026 WMS Control.</p>
@@ -68,12 +66,9 @@
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
 
-
-        // 1. 網頁剛開啟初始化：確保每次「全新開啟」或「重新整理」時，若非正常選單狀態就重設
+        // 1. 初始化檢查
         document.addEventListener("DOMContentLoaded", () => {
-            // 改讀取 sessionStorage
             const cachedUser = sessionStorage.getItem("currentUser");
-            
             if (cachedUser) {
                 try {
                     const userObj = JSON.parse(cachedUser);
@@ -83,36 +78,31 @@
                     sessionStorage.removeItem("currentUser");
                 }
             }
-
-            // 初始化乾淨的登入介面
-            document.getElementById("auth-id").value = "";
-            document.getElementById("auth-pass").value = "";
-            document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
-            document.getElementById("menu-section").classList.add("hidden");
-            document.getElementById("login-section").classList.remove("hidden");
+            clearInputsAndShowLogin();
         });
 
-        // 2. 登入成功時：將憑證寫入 sessionStorage
-        // 請在 submitAuth() 驗證成功的地方，將 localStorage 改為 sessionStorage
-        // 找到這行並修改：
-        sessionStorage.setItem("currentUser", JSON.stringify(sessionUser)); // 確保改為 sessionStorage
-
-        // 3. 點擊登出系統時：徹徹底底清除所有快取記憶
+        // 2. 徹底登出（唯一全域定義，徹底防蓋台）
         function handleLogout() {
-            sessionStorage.removeItem("currentUser"); // 🌟 清除安全快取
+            sessionStorage.removeItem("currentUser");
             sessionStorage.clear();
+            localStorage.removeItem("currentUser"); // 預防性一同清除舊載體
 
-            document.getElementById("auth-id").value = "";
-            document.getElementById("auth-pass").value = "";
-            document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
-            document.getElementById("menu-section").classList.add("hidden");
-            document.getElementById("login-section").classList.remove("hidden");
-
-            // 強制重新整理
+            clearInputsAndShowLogin();
+            
+            // 重新整理網頁，徹底洗乾淨所有 JavaScript 記憶體變數
             window.location.reload();
         }
 
-        // 登入驗證邏輯
+        // 輔助更新畫面 UI 狀態
+        function clearInputsAndShowLogin() {
+            document.getElementById("auth-id").value = "";
+            document.getElementById("auth-pass").value = "";
+            document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
+            document.getElementById("menu-section").classList.add("hidden");
+            document.getElementById("login-section").classList.remove("hidden");
+        }
+
+        // 3. 登入驗證
         async function submitAuth() {
             const userId = document.getElementById("auth-id").value.trim();
             const userPass = document.getElementById("auth-pass").value.trim();
@@ -127,6 +117,7 @@
             if (userPass === "admin123") {
                 const isTestAdmin = (userId === "120404" || userId === "1" || userId.toLowerCase().includes("admin"));
                 const offlineUser = {
+                    id: 999,
                     username: userId,
                     display_name: userId === "1" ? "測試管理員" : "離線人員",
                     role: isTestAdmin ? "admin" : "user"
@@ -139,7 +130,7 @@
             btnSubmit.disabled = true;
             btnSubmit.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> 驗證中...`;
 
-           try {
+            try {
                 const res = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(userId)}&select=*`, {
                     headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
                 });
@@ -151,9 +142,8 @@
                     const matchedUser = users[0];
                     let userRole = matchedUser.role ? matchedUser.role.trim().toLowerCase() : "user";
                     
-                    // 🌟【終極修正】：在這裡，一定要把 matchedUser.id (也就是資料庫 users 表格的流水號整數) 包進去！
                     const sessionUser = { 
-                        id: matchedUser.id,           // 👈 關鍵行：補上這行，把數字 ID 帶出來！
+                        id: matchedUser.id,           // 帶出資料庫流水號數字 ID
                         username: matchedUser.username, 
                         display_name: matchedUser.display_name || matchedUser.username, 
                         role: userRole 
@@ -173,18 +163,16 @@
             }
         }
 
-        // 核心：根據角色權限決定「渲染哪些按鈕」
+        // 4. 動態權限選單渲染
         function renderMenuByRole(userObject) {
             const role = userObject.role;
             const container = document.getElementById("dynamic-buttons");
             container.innerHTML = ""; 
 
-            // 💡 調整核心：取消了所有項目的前綴編號 (1., 2., 3...)，並移除了密碼變更卡片
             const menuItems = [
                 {
                     id: 'picking',
-                    //allowedRoles: 'all',
-                    allowedRoles: 'admin',
+                    allowedRoles: ['admin'],
                     html: `
                         <a href="pda_picking.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-blue-500/50 hover:shadow-blue-900/20 transition-all duration-200 group block">
                             <div class="bg-blue-500/10 text-blue-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
@@ -201,7 +189,6 @@
                 },
                 {
                     id: 'admin_dashboard',
-                    //allowedRoles: ['admin', 'supervisor'],
                     allowedRoles: ['admin'],
                     html: `
                         <a href="order_dashboard.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-indigo-500/50 hover:shadow-indigo-900/20 transition-all duration-200 group block">
@@ -270,22 +257,16 @@
                 }
             ];
 
-            // 過濾並加入符合權限的按鈕
             menuItems.forEach(item => {
-                if (item.allowedRoles === 'all' || item.allowedRoles.includes(role)) {
+                if (item.allowedRoles.includes(role)) {
                     container.insertAdjacentHTML('beforeend', item.html);
                 }
             });
 
-            // 💡 調整核心：動態將目前登入使用者的 username 綁定到修改密碼連結上
             document.getElementById("link-change-password").href = `change_password.html?picker_id=${encodeURIComponent(userObject.username)}`;
-
-   
-            // 調整畫面元素顯示
             document.getElementById("user-display-name").innerText = userObject.display_name;
 
-            // 🌟 核心修改：將權限英文轉換為對應的中文化職稱描述
-            let roleChinese = "出貨人員"; // 預設：其他角色顯示為出貨人員
+            let roleChinese = "出貨人員"; 
             const currentRole = String(role).toLowerCase().trim();
 
             if (currentRole === "admin") {
@@ -294,23 +275,44 @@
                 roleChinese = "接單人員";
             }
 
-            // 將中文化職稱寫入畫面的角色標籤中
             document.getElementById("user-role-tag").innerText = roleChinese;
             document.getElementById("system-subtitle").innerText = "核心功能選單已載入";
             document.getElementById("login-section").classList.add("hidden");
             document.getElementById("menu-section").classList.remove("hidden");
         }
 
-        // 登出系統
-        function handleLogout() {
-            localStorage.removeItem("currentUser");
-            document.getElementById("auth-id").value = "";
-            document.getElementById("auth-pass").value = "";
-            
-            document.getElementById("system-subtitle").innerText = "請先登入系統以載入您的作業權限";
-            document.getElementById("menu-section").classList.add("hidden");
-            document.getElementById("login-section").classList.remove("hidden");
+        // ================= ⏱️【進階功能：閒置超時自動登出】=================
+        let idleTimer = null;
+        const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 💡 設定閒置時間：10 分鐘 (10 * 60 * 1000 毫秒)
+
+        // 重設計時器的函式
+        function resetIdleTimer() {
+            // 如果還沒登入（畫面還在登入區），就不需要倒數
+            const isMenuHidden = document.getElementById("menu-section").classList.contains("hidden");
+            if (isMenuHidden) return;
+
+            // 清除舊的計時器
+            if (idleTimer) clearTimeout(idleTimer);
+
+            // 重新開始倒數 10 分鐘
+            idleTimer = setTimeout(() => {
+                alert("⏰ 系統提示：您已超過 10 分鐘未操作，系統已自動安全登出。");
+                handleLogout(); // 呼叫原本寫好的徹底登出函式
+            }, IDLE_TIMEOUT_MS);
         }
+
+        // 監聽使用者的各種「操作動作」
+        // 只要有點擊、滑動、鍵盤輸入、或是 PDA 觸控螢幕，就代表還在使用，自動重設計時器
+        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(eventType => {
+            window.addEventListener(eventType, resetIdleTimer, { passive: true });
+        });
+
+        // 當選單被渲染出來（登入成功）時，立馬啟動第一次倒數
+        // 修改原本的 renderMenuByRole 底部，或者直接在這裡利用活動監聽觸發
+        window.addEventListener("DOMContentLoaded", () => {
+            // 每秒或有動作時自動防呆檢查
+            resetIdleTimer();
+        });
     </script>
 </body>
 </html>
