@@ -12,42 +12,43 @@
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8">
+        <script>
+            // 貼在 5 個子網頁 body 下方第一個 <script> 最頂端
+            let CURRENT_USER_ID = "";
+            let CURRENT_USER_ROLE = "";
+            let CURRENT_USER_NAME = "";
+            let CURRENT_USER_TABLE_ID = null; // 🌟【關鍵新增】：儲存 users 資料表的數字 id
 
-    <script>
-        // 貼在 5 個子網頁 body 下方第一個 <script> 最頂端
-        let CURRENT_USER_ID = "";
-        let CURRENT_USER_ROLE = "";
-        let CURRENT_USER_NAME = "";
-
-        (function() {
-            const cachedData = sessionStorage.getItem("currentUser");
-            
-            if (!cachedData) {
-                alert("🚨 安全警告：偵測到非法存取！請先從主系統登入驗證。");
-                window.location.href = "index.html";
-                return;
-            }
-
-            try {
-                const userObj = JSON.parse(cachedData);
+            (function() {
+                const cachedData = sessionStorage.getItem("currentUser");
                 
-                // 🌟 在這裡精確提取三個核心變數，並存入全域供整頁程式使用
-                CURRENT_USER_ID = userObj.username;                    // 帳號/工號
-                CURRENT_USER_ROLE = userObj.role.trim().toLowerCase(); // 權限角色
-                CURRENT_USER_NAME = userObj.display_name;              // 顯示姓名
-
-                // 後台網頁的權限過濾（撿貨頁 pda_picking.html 可拿掉這段 if 判斷）
-                if (CURRENT_USER_ROLE !== "admin" && CURRENT_USER_ROLE !== "supervisor") {
-                    alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
+                if (!cachedData) {
+                    alert("🚨 安全警告：偵測到非法存取！請先從主系統登入驗證。");
                     window.location.href = "index.html";
                     return;
                 }
-            } catch (e) {
-                sessionStorage.removeItem("currentUser");
-                window.location.href = "index.html";
-            }
-        })();
-    </script>
+
+                try {
+                    const userObj = JSON.parse(cachedData);
+                    
+                    // 🌟 精確提取變數，包含最核心的數字 id
+                    CURRENT_USER_TABLE_ID = userObj.id ? parseInt(userObj.id) : null; // 👈 提取數字 ID
+                    CURRENT_USER_ID = userObj.username;                    // 帳號/工號字串
+                    CURRENT_USER_ROLE = userObj.role ? userObj.role.trim().toLowerCase() : "user"; // 權限角色
+                    CURRENT_USER_NAME = userObj.display_name;              // 顯示姓名
+
+                    // 後台網頁的權限過濾（撿貨頁 pda_picking.html 可手動拿掉這段 if 判斷，但留著也沒關係，除非是出貨人員要用）
+                    // if (CURRENT_USER_ROLE !== "admin" && CURRENT_USER_ROLE !== "supervisor") {
+                    //     alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
+                    //     window.location.href = "index.html";
+                    //     return;
+                    // }
+                } catch (e) {
+                    sessionStorage.removeItem("currentUser");
+                    window.location.href = "index.html";
+                }
+            })();
+        </script>
 
 
     <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.05),transparent_45%)] pointer-events-none"></div>

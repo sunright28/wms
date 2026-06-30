@@ -266,13 +266,13 @@
             document.getElementById("link-change-password").href = `change_password.html?picker_id=${encodeURIComponent(userObject.username)}`;
             document.getElementById("user-display-name").innerText = userObject.display_name;
 
-            let roleChinese = "出貨人員"; 
+            let roleChinese = "出貨管理人員"; 
             const currentRole = String(role).toLowerCase().trim();
 
             if (currentRole === "admin") {
                 roleChinese = "系統管理員";
             } else if (currentRole === "supervisor") {
-                roleChinese = "接單人員";
+                roleChinese = "訂單管理人員";
             }
 
             document.getElementById("user-role-tag").innerText = roleChinese;

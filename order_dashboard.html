@@ -8,37 +8,43 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen p-4 md:p-8">
+        <script>
+            // 貼在 5 個子網頁 body 下方第一個 <script> 最頂端
+            let CURRENT_USER_ID = "";
+            let CURRENT_USER_ROLE = "";
+            let CURRENT_USER_NAME = "";
+            let CURRENT_USER_TABLE_ID = null; // 🌟【關鍵新增】：儲存 users 資料表的數字 id
 
-    <script>
-        (function() {
-            // 1. 嚴格讀取單一登入記憶 (改用安全期 Session)
-            const cachedData = sessionStorage.getItem("currentUser");
-            
-            if (!cachedData) {
-                alert("🚨 安全警告：偵測到非法存取！請先從主系統登入驗證。");
-                window.location.href = "index.html";
-                return;
-            }
-
-            try {
-                const userObj = JSON.parse(cachedData);
-                const role = userObj.role ? userObj.role.trim().toLowerCase() : "";
-
-                // 2. 核對職責權限：後台管理網頁只允許 admin 或 supervisor 進入
-                if (role !== "admin" && role !== "supervisor") {
-                    alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
+            (function() {
+                const cachedData = sessionStorage.getItem("currentUser");
+                
+                if (!cachedData) {
+                    alert("🚨 安全警告：偵測到非法存取！請先從主系統登入驗證。");
                     window.location.href = "index.html";
                     return;
                 }
-                
-                // 全域放行變數，供網頁後續功能使用
-                window.CURRENT_LOGIN_USER = userObj;
-            } catch (e) {
-                sessionStorage.removeItem("currentUser");
-                window.location.href = "index.html";
-            }
-        })();
-    </script>
+
+                try {
+                    const userObj = JSON.parse(cachedData);
+                    
+                    // 🌟 精確提取變數，包含最核心的數字 id
+                    CURRENT_USER_TABLE_ID = userObj.id ? parseInt(userObj.id) : null; // 👈 提取數字 ID
+                    CURRENT_USER_ID = userObj.username;                    // 帳號/工號字串
+                    CURRENT_USER_ROLE = userObj.role ? userObj.role.trim().toLowerCase() : "user"; // 權限角色
+                    CURRENT_USER_NAME = userObj.display_name;              // 顯示姓名
+
+                    // 後台網頁的權限過濾（撿貨頁 pda_picking.html 可手動拿掉這段 if 判斷，但留著也沒關係，除非是出貨人員要用）
+                    // if (CURRENT_USER_ROLE !== "admin" && CURRENT_USER_ROLE !== "supervisor") {
+                    //     alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
+                    //     window.location.href = "index.html";
+                    //     return;
+                    // }
+                } catch (e) {
+                    sessionStorage.removeItem("currentUser");
+                    window.location.href = "index.html";
+                }
+            })();
+        </script>
 
     <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent_45%)] pointer-events-none"></div>
 
@@ -100,15 +106,15 @@
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
 
-        // 讀取傳遞過來的安全參數以供畫面上權限 Badge 的動態顯示
         const urlParams = new URLSearchParams(window.location.search);
-        const currentOperator = urlParams.get("username") || "進階管理員";
-        const currentRole = (urlParams.get("role") || "user").trim().toLowerCase();
+        const currentOperator = CURRENT_USER_NAME;
+        const currentRole = CURRENT_USER_ROLE;
 
         document.addEventListener("DOMContentLoaded", () => {
-            // 利用您要求的精確三元運算子語法結構，來動態渲染看板上的操作者稱謂
-            document.getElementById("user-display").innerText = 
-                (currentRole === 'admin') ? `${currentOperator} (系統管理員)` : currentOperator;
+            // 顯示精確的使用者名稱與職稱
+            currentRole === 'admin' 
+            ? document.getElementById("user-display").innerText = `${currentOperator} (系統管理員)` 
+            : document.getElementById("user-display").innerText = CURRENT_USER_NAME;
             
             // 網頁開啟時，自動初始化時間區間並自動載入資料庫訂單
             initDates(true);
