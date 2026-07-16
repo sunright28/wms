@@ -3,15 +3,18 @@ name: Keep Supabase Alive
 on:
   schedule:
     # 每週一與週四的上午 9 點自動執行 (UTC 時間)
-    - cron: '0 9 * * 1,4'
+    - cron: '44 14 * * 1,4'
   workflow_dispatch: # 允許手動點擊執行
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase Database
+      - name: Update Keep Alive Timestamp
         run: |
-          curl -X GET "${{secrets.SUPABASE_URL}}/rest/v1/keep_alive?select=*" \
+          curl -X PATCH "${{secrets.SUPABASE_URL}}/rest/v1/keep_alive?id=eq.1" \
           -H "apikey: ${{secrets.SUPABASE_ANON_KEY}}" \
-          -H "Authorization: Bearer ${{secrets.SUPABASE_ANON_KEY}}"
+          -H "Authorization: Bearer ${{secrets.SUPABASE_ANON_KEY}}" \
+          -H "Content-Type: application/json" \
+          -H "Prefer: resolution=merge-duplicates" \
+          -d '{"created_at": "now()"}'
