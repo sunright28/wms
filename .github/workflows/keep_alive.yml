@@ -2,19 +2,24 @@ name: Keep Supabase Alive
 
 on:
   schedule:
-    # 每週一與週四的上午 9 點自動執行 (UTC 時間)
-    - cron: '44 14 * * 1,4'
+    # 國際時間 01:00 = 台北時間早上 09:00 自動執行
+    - cron: '51 20 * * 1,4'
   workflow_dispatch: # 允許手動點擊執行
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Update Keep Alive Timestamp
+      - name: Update Keep Alive Timestamp with Taipei Time
         run: |
+          # 1. 設定系統時區為台北，並取得 ISO 8601 格式的台北時間
+          TAIPEI_TIME=$(TZ="Asia/Taipei" date --iso-8601=seconds)
+          echo "當前台北時間: $TAIPEI_TIME"
+          
+          # 2. 將台北時間寫入 Supabase
           curl -X PATCH "${{secrets.SUPABASE_URL}}/rest/v1/keep_alive?id=eq.1" \
           -H "apikey: ${{secrets.SUPABASE_ANON_KEY}}" \
           -H "Authorization: Bearer ${{secrets.SUPABASE_ANON_KEY}}" \
           -H "Content-Type: application/json" \
           -H "Prefer: resolution=merge-duplicates" \
-          -d '{"created_at": "now()"}'
+          -d "{\"created_at\": \"$TAIPEI_TIME\"}"
