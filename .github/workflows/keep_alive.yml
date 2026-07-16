@@ -3,7 +3,7 @@ name: Keep Supabase Alive
 on:
   schedule:
     # 每週一與週四的上午 9 點自動執行 (UTC 時間)
-    - cron: '0 9 * * 1,4'
+    - cron: '28 14 * * 1,4'
   workflow_dispatch: # 允許手動點擊執行
 
 jobs:
