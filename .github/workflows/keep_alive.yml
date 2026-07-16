@@ -3,7 +3,7 @@ name: Keep Supabase Alive
 on:
   schedule:
     # 國際時間 01:00 = 台北時間早上 09:00 自動執行
-    - cron: '51 20 * * 1,4'
+    - cron: '58 6 * * 1,4'
   workflow_dispatch: # 允許手動點擊執行
 
 jobs:
