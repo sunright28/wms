@@ -200,7 +200,7 @@
                 },
                 {
                     id: 'admin_dashboard',
-                    allowedRoles: ['admin', 'supervisor'], // 🌟 已加入 'supervisor' 權限
+                    allowedRoles: ['admin', 'supervisor'],
                     html: `
                         <a href="order_dashboard.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-indigo-500/50 hover:shadow-indigo-900/20 transition-all duration-200 group block">
                             <div class="bg-indigo-500/10 text-indigo-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
@@ -245,6 +245,23 @@
                                 <p class="text-xs text-slate-400 mt-0.5">長寬高、才積、入數及毛重等基礎參數變更</p>
                             </div>
                             <div class="text-slate-500 group-hover:text-emerald-400 transition-colors">
+                                <i class="fa-solid fa-chevron-right text-sm"></i>
+                            </div>
+                        </a>`
+                },
+                {
+                    id: 'product_audit_logs',
+                    allowedRoles: ['admin'],
+                    html: `
+                        <a href="product_audit_logs.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-purple-500/50 hover:shadow-purple-900/20 transition-all duration-200 group block">
+                            <div class="bg-purple-500/10 text-purple-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
+                                <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h2 class="text-base font-bold text-slate-200 group-hover:text-purple-400 transition-colors">產品主檔變更履歷</h2>
+                                <p class="text-xs text-slate-400 mt-0.5">產品主檔歷史修改記錄、變更前後差異查詢</p>
+                            </div>
+                            <div class="text-slate-500 group-hover:text-purple-400 transition-colors">
                                 <i class="fa-solid fa-chevron-right text-sm"></i>
                             </div>
                         </a>`
