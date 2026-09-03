@@ -115,7 +115,7 @@
 
             // 離線測試後門
             if (userPass === "admin123") {
-                const isTestAdmin = (userId === "120404" || userId === "1" || userId.toLowerCase().includes("admin"));
+                const isTestAdmin = (userId === "120404" || userId === "admin" || userId.toLowerCase().includes("admin"));
                 const offlineUser = {
                     id: 999,
                     username: userId,

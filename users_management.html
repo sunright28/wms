@@ -394,7 +394,7 @@
             const isEdit = (targetId !== "");
             
             // 阻擋惡意修改本尊或測試管理帳號的機制
-            if (isEdit && (username === "120404" || username === "1") && role !== "admin") {
+            if (isEdit && (username === "120404" || username === "admin") && role !== "admin") {
                 alert("🚨 資安防禦：禁止調降核心系統測試管理員的 [admin] 權限職等！");
                 return;
             }
