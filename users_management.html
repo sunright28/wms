@@ -69,7 +69,7 @@
                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
                     <i class="fa-solid fa-magnifying-glass text-xs"></i>
                 </span>
-                <input type="text" id="search-input" oninput="filterUsers()" placeholder="輸入關鍵字搜尋工號、姓名或狀態(在職/離職)..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+                <input type="text" id="search-input" oninput="filterUsers()" placeholder="輸入關鍵字搜尋工號、姓名或狀態(在職/留職/離職)..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
             </div>
             
             <div class="flex items-center gap-2">
@@ -140,16 +140,23 @@
                     </select>
                 </div>
 
-                <!-- 🌟【新增】：在職狀態勾選欄位 -->
-                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/80 flex items-center justify-between">
-                    <div>
-                        <label for="input-active" class="font-bold text-slate-200 cursor-pointer block">在職狀態 (Active)</label>
-                        <p class="text-[10px] text-slate-400">取消勾選代表該同仁已離職</p>
+                <!-- 🌟【新增】：在職狀態 Radio Option Button 群組 -->
+                <div>
+                    <label class="block font-bold text-slate-400 mb-1.5">在職狀態 (Status)</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="flex items-center justify-center gap-1.5 p-2 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-emerald-500/50 transition-all has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10 has-[:checked]:text-emerald-400 text-slate-400 font-bold">
+                            <input type="radio" name="input-active-status" value="在職" class="accent-emerald-500 cursor-pointer">
+                            <span>在職</span>
+                        </label>
+                        <label class="flex items-center justify-center gap-1.5 p-2 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-amber-500/50 transition-all has-[:checked]:border-amber-500 has-[:checked]:bg-amber-500/10 has-[:checked]:text-amber-400 text-slate-400 font-bold">
+                            <input type="radio" name="input-active-status" value="留職" class="accent-amber-500 cursor-pointer">
+                            <span>留職</span>
+                        </label>
+                        <label class="flex items-center justify-center gap-1.5 p-2 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-rose-500/50 transition-all has-[:checked]:border-rose-500 has-[:checked]:bg-rose-500/10 has-[:checked]:text-rose-400 text-slate-400 font-bold">
+                            <input type="radio" name="input-active-status" value="離職" class="accent-rose-500 cursor-pointer">
+                            <span>離職</span>
+                        </label>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="input-active" class="sr-only peer" checked>
-                        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                    </label>
                 </div>
                 
                 <div class="flex gap-2 pt-2">
@@ -176,6 +183,13 @@
 
             fetchAllUsers();
         });
+
+        // 輔助函式：解析 active 狀態文字 (相容舊版 Boolean/Null 與新版 Varchar)
+        function normalizeStatus(val) {
+            if (val === "在職" || val === "留職" || val === "離職") return val;
+            if (val === false || val === "false") return "離職";
+            return "在職"; // 預設為在職 (true, null, undefined)
+        }
 
         // 📥 自 Supabase 獲取所有使用者名單
         async function fetchAllUsers() {
@@ -224,14 +238,22 @@
                     roleIcon = '<i class="fa-solid fa-user-gear text-indigo-400"></i>';
                 }
 
-                // 🌟 在職狀態標籤渲染 (相容 null/undefined，預設為 true)
-                const isActive = (user.active !== false);
-                const activeBadge = isActive 
-                    ? `<span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check text-[9px]"></i> 在職</span>`
-                    : `<span class="text-[10px] bg-slate-700/50 text-slate-400 border border-slate-600/50 px-2 py-0.5 rounded-md font-bold flex items-center gap-1"><i class="fa-solid fa-circle-xmark text-[9px]"></i> 離職</span>`;
+                // 🌟 在職狀態三種標籤渲染
+                const statusStr = normalizeStatus(user.active);
+                let activeBadge = "";
+                let cardOpacity = "";
+
+                if (statusStr === "在職") {
+                    activeBadge = `<span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check text-[9px]"></i> 在職</span>`;
+                } else if (statusStr === "留職") {
+                    activeBadge = `<span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md font-bold flex items-center gap-1"><i class="fa-solid fa-circle-pause text-[9px]"></i> 留職</span>`;
+                } else {
+                    activeBadge = `<span class="text-[10px] bg-slate-700/50 text-slate-400 border border-slate-600/50 px-2 py-0.5 rounded-md font-bold flex items-center gap-1"><i class="fa-solid fa-circle-xmark text-[9px]"></i> 離職</span>`;
+                    cardOpacity = "opacity-75";
+                }
 
                 const card = document.createElement("div");
-                card.className = `bg-slate-800/60 rounded-2xl border ${isActive ? 'border-slate-700/50' : 'border-slate-800 opacity-75'} p-4 hover:border-slate-600 transition-all shadow-md flex flex-col justify-between gap-4`;
+                card.className = `bg-slate-800/60 rounded-2xl border ${statusStr === '離職' ? 'border-slate-800' : 'border-slate-700/50'} p-4 hover:border-slate-600 transition-all shadow-md flex flex-col justify-between gap-4 ${cardOpacity}`;
                 
                 card.innerHTML = `
                     <div class="space-y-3">
@@ -256,7 +278,7 @@
                         </div>
 
                         <div class="bg-slate-900/60 rounded-xl p-2.5 border border-slate-800/80 font-mono text-[11px] space-y-1">
-                            <div class="flex justify-between"><span class="text-slate-500">在職狀態:</span><span class="${isActive ? 'text-emerald-400' : 'text-slate-400'} font-bold">${isActive ? '在職中' : '已離職'}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500">在職狀態:</span><span class="${statusStr === '在職' ? 'text-emerald-400' : statusStr === '留職' ? 'text-amber-400' : 'text-slate-400'} font-bold">${statusStr}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500">安全系統密碼:</span><span class="text-slate-200 font-bold tracking-wider">${user.password}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500">資料列唯一碼:</span><span class="text-slate-600 text-[10px]">ID-${user.id}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500">帳號配置日期:</span><span class="text-slate-400">${formatDate(user.created_at)}</span></div>
@@ -276,7 +298,7 @@
             });
         }
 
-        // 🔍 即時本機關鍵字篩選 (擴充支援 在職/離職 搜尋)
+        // 🔍 即時本機關鍵字篩選 (支援 1.在職 2.留職 3.離職 搜尋)
         function filterUsers() {
             const query = document.getElementById("search-input").value.trim().toLowerCase();
             if(!query) {
@@ -284,12 +306,11 @@
                 return;
             }
             const filtered = allUsersCache.filter(u => {
-                const isActive = (u.active !== false);
-                const activeText = isActive ? "在職" : "離職";
+                const statusStr = normalizeStatus(u.active);
                 return String(u.username).toLowerCase().includes(query) || 
                        String(u.display_name).toLowerCase().includes(query) ||
                        String(u.role).toLowerCase().includes(query) ||
-                       activeText.includes(query);
+                       statusStr.toLowerCase().includes(query);
             });
             renderUsersList(filtered);
         }
@@ -303,7 +324,9 @@
             document.getElementById("input-display-name").value = "";
             document.getElementById("input-password").value = "";
             document.getElementById("input-role").value = "user";
-            document.getElementById("input-active").checked = true; // 新增預設為在職
+            
+            // 預設選擇「在職」
+            setRadioValue("input-active-status", "在職");
             
             document.getElementById("modal-icon-container").className = "w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-base shadow-inner";
             document.getElementById("modal-icon-container").innerHTML = `<i class="fa-solid fa-user-plus"></i>`;
@@ -319,7 +342,10 @@
             document.getElementById("input-display-name").value = userObj.display_name || "";
             document.getElementById("input-password").value = userObj.password || "";
             document.getElementById("input-role").value = userObj.role || "user";
-            document.getElementById("input-active").checked = (userObj.active !== false); // 設定勾選狀態
+            
+            // 設定 Radio 選取對應的狀態 (在職 / 留職 / 離職)
+            const currentStatus = normalizeStatus(userObj.active);
+            setRadioValue("input-active-status", currentStatus);
 
             document.getElementById("modal-icon-container").className = "w-9 h-9 rounded-xl bg-amber-600/20 text-amber-400 flex items-center justify-center text-base shadow-inner";
             document.getElementById("modal-icon-container").innerHTML = `<i class="fa-solid fa-user-pen"></i>`;
@@ -331,6 +357,25 @@
             document.getElementById("user-modal").classList.add("hidden");
         }
 
+        // 輔助函式：設定或獲取 Radio Button 的值
+        function setRadioValue(name, val) {
+            const radios = document.getElementsByName(name);
+            for (let r of radios) {
+                if (r.value === val) {
+                    r.checked = true;
+                    break;
+                }
+            }
+        }
+
+        function getRadioValue(name) {
+            const radios = document.getElementsByName(name);
+            for (let r of radios) {
+                if (r.checked) return r.value;
+            }
+            return "在職";
+        }
+
         // 📤 表單驗證與雲端提交 (INSERT / PATCH)
         async function submitUserForm() {
             const targetId = document.getElementById("target-id").value;
@@ -338,7 +383,7 @@
             const displayName = document.getElementById("input-display-name").value.trim();
             const password = document.getElementById("input-password").value.trim();
             const role = document.getElementById("input-role").value;
-            const active = document.getElementById("input-active").checked; // 🌟 取得勾選狀態 (boolean)
+            const activeStatus = getRadioValue("input-active-status"); // 🌟 取得 Radio 選取的字串值 ("在職" | "留職" | "離職")
             const btnSubmit = document.getElementById("btn-modal-submit");
 
             if(!username || !displayName || !password) {
@@ -362,7 +407,7 @@
                     display_name: displayName,
                     password: password,
                     role: role,
-                    active: active // 🌟 寫入 / 更新 active 欄位
+                    active: activeStatus // 🌟 寫入 / 更新 active varchar 欄位
                 };
 
                 let url = `${SUPABASE_URL}/rest/v1/users`;
@@ -409,7 +454,7 @@
                 return;
             }
 
-            if(!confirm(`🚨 組織重組最高警告！\n\n確定要永久刪除同仁 [ ${displayName} ] 嗎？\n這將導致該帳號立刻失效且無法再登入系統！`)) return;
+            if(!confirm(`🚨 組織重組最高警告！\n\n確定要永久刪除同仁 [ ${displayName} ] 嗎？\n這將導致該帳號獨立記錄被抹除！`)) return;
 
             try {
                 const url = `${SUPABASE_URL}/rest/v1/users?id=eq.${id}`;
