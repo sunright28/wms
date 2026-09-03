@@ -183,7 +183,7 @@
             const menuItems = [
                 {
                     id: 'picking',
-                    allowedRoles: ['admin', 'user'], // 🌟 已加入 'user' 權限
+                    allowedRoles: ['admin', 'user'],
                     html: `
                         <a href="pda_picking.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-blue-500/50 hover:shadow-blue-900/20 transition-all duration-200 group block">
                             <div class="bg-blue-500/10 text-blue-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
@@ -200,7 +200,7 @@
                 },
                 {
                     id: 'admin_dashboard',
-                    allowedRoles: ['admin'],
+                    allowedRoles: ['admin', 'supervisor'], // 🌟 已加入 'supervisor' 權限
                     html: `
                         <a href="order_dashboard.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-indigo-500/50 hover:shadow-indigo-900/20 transition-all duration-200 group block">
                             <div class="bg-indigo-500/10 text-indigo-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
