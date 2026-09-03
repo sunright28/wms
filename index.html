@@ -120,7 +120,8 @@
                     id: 999,
                     username: userId,
                     display_name: userId === "1" ? "測試管理員" : "離線人員",
-                    role: isTestAdmin ? "admin" : "user"
+                    role: isTestAdmin ? "admin" : "user",
+                    active: "在職"
                 };
                 sessionStorage.setItem("currentUser", JSON.stringify(offlineUser));
                 renderMenuByRole(offlineUser);
@@ -140,13 +141,23 @@
 
                 if (users.length > 0 && String(users[0].password) === String(userPass)) {
                     const matchedUser = users[0];
+                    
+                    // 🌟【關鍵新增】：檢查 active 在職狀態 (相容 Varchar、Boolean 及 Null)
+                    const statusStr = matchedUser.active;
+                    if (statusStr === "離職" || statusStr === "留職" || statusStr === false) {
+                        const stateText = (statusStr === "留職") ? "留職停薪" : "已離職";
+                        alert(`🚫 權限阻擋：帳號 [ ${matchedUser.display_name || userId} ] 目前狀態為「${stateText}」，無法存取系統！`);
+                        return; // 🛑 阻擋進入第 4 階段
+                    }
+
                     let userRole = matchedUser.role ? matchedUser.role.trim().toLowerCase() : "user";
                     
                     const sessionUser = { 
                         id: matchedUser.id,           // 帶出資料庫流水號數字 ID
                         username: matchedUser.username, 
                         display_name: matchedUser.display_name || matchedUser.username, 
-                        role: userRole 
+                        role: userRole,
+                        active: matchedUser.active || "在職"
                     };
 
                     sessionStorage.setItem("currentUser", JSON.stringify(sessionUser));
@@ -287,30 +298,22 @@
 
         // 重設計時器的函式
         function resetIdleTimer() {
-            // 如果還沒登入（畫面還在登入區），就不需要倒數
             const isMenuHidden = document.getElementById("menu-section").classList.contains("hidden");
             if (isMenuHidden) return;
 
-            // 清除舊的計時器
             if (idleTimer) clearTimeout(idleTimer);
 
-            // 重新開始倒數 10 分鐘
             idleTimer = setTimeout(() => {
                 alert("⏰ 系統提示：您已超過 10 分鐘未操作，系統已自動安全登出。");
-                handleLogout(); // 呼叫原本寫好的徹底登出函式
+                handleLogout();
             }, IDLE_TIMEOUT_MS);
         }
 
-        // 監聽使用者的各種「操作動作」
-        // 只要有點擊、滑動、鍵盤輸入、或是 PDA 觸控螢幕，就代表還在使用，自動重設計時器
         ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(eventType => {
             window.addEventListener(eventType, resetIdleTimer, { passive: true });
         });
 
-        // 當選單被渲染出來（登入成功）時，立馬啟動第一次倒數
-        // 修改原本的 renderMenuByRole 底部，或者直接在這裡利用活動監聽觸發
         window.addEventListener("DOMContentLoaded", () => {
-            // 每秒或有動作時自動防呆檢查
             resetIdleTimer();
         });
     </script>
