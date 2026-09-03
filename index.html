@@ -142,12 +142,12 @@
                 if (users.length > 0 && String(users[0].password) === String(userPass)) {
                     const matchedUser = users[0];
                     
-                    // 🌟【關鍵新增】：檢查 active 在職狀態 (相容 Varchar、Boolean 及 Null)
+                    // 檢查 active 在職狀態 (相容 Varchar、Boolean 及 Null)
                     const statusStr = matchedUser.active;
                     if (statusStr === "離職" || statusStr === "留職" || statusStr === false) {
                         const stateText = (statusStr === "留職") ? "留職停薪" : "已離職";
                         alert(`🚫 權限阻擋：帳號 [ ${matchedUser.display_name || userId} ] 目前狀態為「${stateText}」，無法存取系統！`);
-                        return; // 🛑 阻擋進入第 4 階段
+                        return; // 阻擋進入第 4 階段
                     }
 
                     let userRole = matchedUser.role ? matchedUser.role.trim().toLowerCase() : "user";
@@ -183,7 +183,7 @@
             const menuItems = [
                 {
                     id: 'picking',
-                    allowedRoles: ['admin'],
+                    allowedRoles: ['admin', 'user'], // 🌟 已加入 'user' 權限
                     html: `
                         <a href="pda_picking.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/60 shadow-md hover:border-blue-500/50 hover:shadow-blue-900/20 transition-all duration-200 group block">
                             <div class="bg-blue-500/10 text-blue-400 p-3 rounded-xl group-hover:scale-110 transition-transform flex items-center justify-center w-11 h-11">
