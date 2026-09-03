@@ -37,12 +37,6 @@
                     CURRENT_USER_ROLE = userObj.role ? userObj.role.trim().toLowerCase() : "user"; // 權限角色
                     CURRENT_USER_NAME = userObj.display_name;              // 顯示姓名
 
-                    // 後台網頁的權限過濾（撿貨頁 pda_picking.html 可手動拿掉這段 if 判斷，但留著也沒關係，除非是出貨人員要用）
-                    // if (CURRENT_USER_ROLE !== "admin" && CURRENT_USER_ROLE !== "supervisor") {
-                    //     alert("❌ 權限不足：您目前的職責無法存取管理後台控制台！");
-                    //     window.location.href = "index.html";
-                    //     return;
-                    // }
                 } catch (e) {
                     sessionStorage.removeItem("currentUser");
                     window.location.href = "index.html";
@@ -75,7 +69,7 @@
                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
                     <i class="fa-solid fa-magnifying-glass text-xs"></i>
                 </span>
-                <input type="text" id="search-input" oninput="filterUsers()" placeholder="輸入關鍵字搜尋工號或姓名..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+                <input type="text" id="search-input" oninput="filterUsers()" placeholder="輸入關鍵字搜尋工號、姓名或狀態(在職/離職)..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
             </div>
             
             <div class="flex items-center gap-2">
@@ -107,6 +101,7 @@
         <p class="text-center text-[11px] text-slate-600 font-mono">Secure Enterprise Routing Network | © 2026 WMS Control.</p>
     </div>
 
+    <!-- 編輯 / 新增彈窗 -->
     <div id="user-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
         <div class="bg-slate-800 max-w-sm w-full p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-4 relative">
             <button onclick="closeUserModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -144,6 +139,18 @@
                         <option value="admin">admin (系統管理員/人員管理及重置訂單)</option>
                     </select>
                 </div>
+
+                <!-- 🌟【新增】：在職狀態勾選欄位 -->
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/80 flex items-center justify-between">
+                    <div>
+                        <label for="input-active" class="font-bold text-slate-200 cursor-pointer block">在職狀態 (Active)</label>
+                        <p class="text-[10px] text-slate-400">取消勾選代表該同仁已離職</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="input-active" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                </div>
                 
                 <div class="flex gap-2 pt-2">
                     <button onclick="closeUserModal()" class="flex-1 bg-slate-700 hover:bg-slate-650 text-slate-300 font-bold py-2 rounded-xl transition-colors cursor-pointer">取消</button>
@@ -157,7 +164,6 @@
         const SUPABASE_URL = "https://mmqvewwmpzutyzrovnkp.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tcXZld3dtcHp1dHl6cm92bmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTE0OTYsImV4cCI6MjA5NTg2NzQ5Nn0.taGVo2jp3Z5BQ0jmZiC0j-Yn5oVryFbHiopHst8NK14";
 
-        // 讀取網址參數以於表頭高亮渲染管理員尊稱
         const urlParams = new URLSearchParams(window.location.search);
         const currentOperator = CURRENT_USER_NAME;
         const currentRole = CURRENT_USER_ROLE;
@@ -165,7 +171,6 @@
         let allUsersCache = [];
 
         document.addEventListener("DOMContentLoaded", () => {
-            // 與 order_dashboard 一致的動態表頭尊稱渲染語法
             document.getElementById("user-display").innerText = 
                 (currentRole === 'admin') ? `${currentOperator} (系統管理員)` : currentOperator;
 
@@ -219,8 +224,14 @@
                     roleIcon = '<i class="fa-solid fa-user-gear text-indigo-400"></i>';
                 }
 
+                // 🌟 在職狀態標籤渲染 (相容 null/undefined，預設為 true)
+                const isActive = (user.active !== false);
+                const activeBadge = isActive 
+                    ? `<span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-bold flex items-center gap-1"><i class="fa-solid fa-circle-check text-[9px]"></i> 在職</span>`
+                    : `<span class="text-[10px] bg-slate-700/50 text-slate-400 border border-slate-600/50 px-2 py-0.5 rounded-md font-bold flex items-center gap-1"><i class="fa-solid fa-circle-xmark text-[9px]"></i> 離職</span>`;
+
                 const card = document.createElement("div");
-                card.className = "bg-slate-800/60 rounded-2xl border border-slate-700/50 p-4 hover:border-slate-600 transition-all shadow-md flex flex-col justify-between gap-4";
+                card.className = `bg-slate-800/60 rounded-2xl border ${isActive ? 'border-slate-700/50' : 'border-slate-800 opacity-75'} p-4 hover:border-slate-600 transition-all shadow-md flex flex-col justify-between gap-4`;
                 
                 card.innerHTML = `
                     <div class="space-y-3">
@@ -230,16 +241,22 @@
                                     ${roleIcon}
                                 </div>
                                 <div>
-                                    <h3 class="font-black text-white text-sm tracking-wide">${user.display_name || '未設定姓名'}</h3>
+                                    <h3 class="font-black text-white text-sm tracking-wide flex items-center gap-2">
+                                        ${user.display_name || '未設定姓名'}
+                                    </h3>
                                     <p class="text-[11px] font-mono text-slate-500 mt-0.5">工號: <span class="text-slate-300 font-bold">${user.username}</span></p>
                                 </div>
                             </div>
-                            <span class="text-[10px] border px-2 py-0.5 rounded-md font-bold font-mono ${roleBadgeColor}">
-                                ${user.role || 'user'}
-                            </span>
+                            <div class="flex flex-col items-end gap-1">
+                                <span class="text-[10px] border px-2 py-0.5 rounded-md font-bold font-mono ${roleBadgeColor}">
+                                    ${user.role || 'user'}
+                                </span>
+                                ${activeBadge}
+                            </div>
                         </div>
 
                         <div class="bg-slate-900/60 rounded-xl p-2.5 border border-slate-800/80 font-mono text-[11px] space-y-1">
+                            <div class="flex justify-between"><span class="text-slate-500">在職狀態:</span><span class="${isActive ? 'text-emerald-400' : 'text-slate-400'} font-bold">${isActive ? '在職中' : '已離職'}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500">安全系統密碼:</span><span class="text-slate-200 font-bold tracking-wider">${user.password}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500">資料列唯一碼:</span><span class="text-slate-600 text-[10px]">ID-${user.id}</span></div>
                             <div class="flex justify-between"><span class="text-slate-500">帳號配置日期:</span><span class="text-slate-400">${formatDate(user.created_at)}</span></div>
@@ -259,18 +276,21 @@
             });
         }
 
-        // 🔍 即時本機關鍵字篩選
+        // 🔍 即時本機關鍵字篩選 (擴充支援 在職/離職 搜尋)
         function filterUsers() {
             const query = document.getElementById("search-input").value.trim().toLowerCase();
             if(!query) {
                 renderUsersList(allUsersCache);
                 return;
             }
-            const filtered = allUsersCache.filter(u => 
-                String(u.username).toLowerCase().includes(query) || 
-                String(u.display_name).toLowerCase().includes(query) ||
-                String(u.role).toLowerCase().includes(query)
-            );
+            const filtered = allUsersCache.filter(u => {
+                const isActive = (u.active !== false);
+                const activeText = isActive ? "在職" : "離職";
+                return String(u.username).toLowerCase().includes(query) || 
+                       String(u.display_name).toLowerCase().includes(query) ||
+                       String(u.role).toLowerCase().includes(query) ||
+                       activeText.includes(query);
+            });
             renderUsersList(filtered);
         }
 
@@ -283,6 +303,7 @@
             document.getElementById("input-display-name").value = "";
             document.getElementById("input-password").value = "";
             document.getElementById("input-role").value = "user";
+            document.getElementById("input-active").checked = true; // 新增預設為在職
             
             document.getElementById("modal-icon-container").className = "w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-base shadow-inner";
             document.getElementById("modal-icon-container").innerHTML = `<i class="fa-solid fa-user-plus"></i>`;
@@ -298,6 +319,7 @@
             document.getElementById("input-display-name").value = userObj.display_name || "";
             document.getElementById("input-password").value = userObj.password || "";
             document.getElementById("input-role").value = userObj.role || "user";
+            document.getElementById("input-active").checked = (userObj.active !== false); // 設定勾選狀態
 
             document.getElementById("modal-icon-container").className = "w-9 h-9 rounded-xl bg-amber-600/20 text-amber-400 flex items-center justify-center text-base shadow-inner";
             document.getElementById("modal-icon-container").innerHTML = `<i class="fa-solid fa-user-pen"></i>`;
@@ -316,6 +338,7 @@
             const displayName = document.getElementById("input-display-name").value.trim();
             const password = document.getElementById("input-password").value.trim();
             const role = document.getElementById("input-role").value;
+            const active = document.getElementById("input-active").checked; // 🌟 取得勾選狀態 (boolean)
             const btnSubmit = document.getElementById("btn-modal-submit");
 
             if(!username || !displayName || !password) {
@@ -338,7 +361,8 @@
                 const payload = {
                     display_name: displayName,
                     password: password,
-                    role: role
+                    role: role,
+                    active: active // 🌟 寫入 / 更新 active 欄位
                 };
 
                 let url = `${SUPABASE_URL}/rest/v1/users`;
