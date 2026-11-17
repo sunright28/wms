@@ -17,7 +17,7 @@ jobs:
           echo "當前台北時間: $TAIPEI_TIME"
           
           # 2. 將台北時間寫入 Supabase
-          curl -X PATCH "${{secrets.SUPABASE_URL}}/rest/v1/keep_alive?id=eq.1" \
+          curl -f -X PATCH "${{secrets.SUPABASE_URL}}/rest/v1/keep_alive?id=eq.1" \
           -H "apikey: ${{secrets.SUPABASE_ANON_KEY}}" \
           -H "Authorization: Bearer ${{secrets.SUPABASE_ANON_KEY}}" \
           -H "Content-Type: application/json" \
